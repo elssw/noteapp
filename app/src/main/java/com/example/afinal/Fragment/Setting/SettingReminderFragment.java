@@ -31,14 +31,17 @@ import com.example.afinal.Fragment.SettingFragment;
 import com.example.afinal.R;
 
 import java.util.Calendar;
+import static com.example.afinal.Fragment.Setting.Constants.*;
 
 public class SettingReminderFragment extends Fragment {
     private RadioGroup reminderType;
     private TimePicker dailyPicker;
     private View reminderWeekly;
     private View reminderMonthly;
-    private Button btnConfirm;
+    private Button btnReminderConfirm;
+    private Button btnReminderCancel;
     private TextView tvReminderState;
+    int requestCode;
 
     private ActivityResultLauncher<String> requestPermissionLauncher;
 
@@ -64,12 +67,13 @@ public class SettingReminderFragment extends Fragment {
         dailyPicker = view.findViewById(R.id.time_picker_daily);
         reminderWeekly = view.findViewById(R.id.reminder_weekly);
         reminderMonthly = view.findViewById(R.id.reminder_monthly);
-        btnConfirm = view.findViewById(R.id.btn_reminder_confirm);
+        btnReminderConfirm = view.findViewById(R.id.btn_reminder_confirm);
+        btnReminderCancel = view.findViewById(R.id.btn_reminder_cancel);
         tvReminderState = view.findViewById(R.id.tv_reminder_state);
 
         // Reminder State
         prefs = requireContext().getSharedPreferences(PREF_REMINDER_STATE, 0);
-        String mode = prefs.getString("reminder_mode", "未設定");
+        String mode = prefs.getString("reminder_mode", "尚未設定");
         String time = prefs.getString("reminder_time", "");
         tvReminderState.setText("提醒時間：" + mode + " " + time);
 
@@ -106,127 +110,112 @@ public class SettingReminderFragment extends Fragment {
             }
         });
 
+        // 取消提醒
+        btnReminderCancel.setOnClickListener(v -> {
+            Log.d(TAG, "SettingReminderFragment _ Testing Cancel");
+            clearAllReminders();
 
-        // 送出通知時程
-        btnConfirm.setOnClickListener(v -> {
-            Log.d(TAG, "User Pushed btnConfirm.");
+            // 跳回 SettingFragment
+            navigateToSettingFragmentDelayed(800);
+        });
 
-            if (isAdded() && getActivity() != null) {
-                Toast.makeText(getContext(), "Remind Finished.", Toast.LENGTH_SHORT).show();
-            }
+        // 設定提醒
+        btnReminderConfirm.setOnClickListener(v -> {
+            Log.d(TAG, "SettingReminderFragment _ Testing Confirm");
 
-            AlarmManager alarmManager = (AlarmManager) requireContext().getSystemService(Context.ALARM_SERVICE);
-            Intent intent = new Intent(requireContext(), ReminderReceiver.class);
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(requireContext(), 0, intent, PendingIntent.FLAG_IMMUTABLE);
-
-            // 建立時間物件
             Calendar calendar = Calendar.getInstance();
             int hour, minute;
-            SharedPreferences.Editor editor = prefs.edit();
-            // 判斷提醒類型
+
             int checkedId = reminderType.getCheckedRadioButtonId();
-
-            Log.d(TAG, "Remind Type choise ID:" + checkedId);
-
             if (checkedId == R.id.rb_daily) {
                 dailyPicker.clearFocus();
                 hour = dailyPicker.getHour();
                 minute = dailyPicker.getMinute();
-
-                Log.d(TAG, "Remind Dayly:" + hour + ":" + minute);
-
                 calendar.set(Calendar.HOUR_OF_DAY, hour);
                 calendar.set(Calendar.MINUTE, minute);
                 calendar.set(Calendar.SECOND, 0);
-                scheduleAlarm(calendar, 1001);
-                editor.putString("reminder_mode", "EveryDay");
-                editor.putString("reminder_time", String.format("%02d:%02d", hour, minute));
+                setReminder(REQUEST_CODE_DAILY, calendar, "每日", String.format("%02d:%02d", hour, minute));
             } else if (checkedId == R.id.rb_weekly) {
-                TimePicker picker = view.findViewById(R.id.time_picker_weekly);
+                TimePicker picker = getView().findViewById(R.id.time_picker_weekly);
                 picker.clearFocus();
                 hour = picker.getHour();
                 minute = picker.getMinute();
-
-                int dayOfWeek = ((Spinner) view.findViewById(R.id.spinner_weekday)).getSelectedItemPosition() + 1;
-
-                Log.d(TAG, "Remind Weekly:" + hour + ":" + minute + "，dayOfWeek:" + dayOfWeek);
-
+                int dayOfWeek = ((Spinner) getView().findViewById(R.id.spinner_weekday)).getSelectedItemPosition() + 1;
                 calendar.set(Calendar.DAY_OF_WEEK, dayOfWeek);
                 calendar.set(Calendar.HOUR_OF_DAY, hour);
                 calendar.set(Calendar.MINUTE, minute);
                 calendar.set(Calendar.SECOND, 0);
-                scheduleAlarm(calendar, 1002);
-                String[] weekdays = getResources().getStringArray(R.array.weekdays); // 確保你有此 array
-                String weekday = weekdays[((Spinner) view.findViewById(R.id.spinner_weekday)).getSelectedItemPosition()];
-                editor.putString("reminder_mode", "Every  " + weekday);
-                editor.putString("reminder_time", String.format("%02d:%02d", hour, minute));
+                String weekday = getResources().getStringArray(R.array.weekdays)[dayOfWeek - 1];
+                setReminder(REQUEST_CODE_WEEKLY, calendar, "每週" + weekday, String.format("%02d:%02d", hour, minute));
             } else if (checkedId == R.id.rb_monthly) {
-                TimePicker picker = view.findViewById(R.id.time_picker_monthly);
+                TimePicker picker = getView().findViewById(R.id.time_picker_monthly);
                 picker.clearFocus();
                 hour = picker.getHour();
                 minute = picker.getMinute();
-
-                String dayStr = ((EditText) view.findViewById(R.id.edit_day_of_month)).getText().toString();
+                String dayStr = ((EditText) getView().findViewById(R.id.edit_day_of_month)).getText().toString();
                 if (dayStr.isEmpty()) {
-                    Log.e(TAG, "User didn't input date.");
-                    Toast.makeText(getContext(), "Please input reminder date.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "請輸入日期", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 int day = Integer.parseInt(dayStr);
-
-                Log.d(TAG, "Remind Monthly:" + hour + ":" + minute + "，date:" + day);
-
                 calendar.set(Calendar.DAY_OF_MONTH, day);
                 calendar.set(Calendar.HOUR_OF_DAY, hour);
                 calendar.set(Calendar.MINUTE, minute);
                 calendar.set(Calendar.SECOND, 0);
-                scheduleAlarm(calendar, 1003);
-                editor.putString("reminder_mode", "Every " + dayStr);
-                editor.putString("reminder_time", String.format("%02d:%02d", hour, minute));
+                setReminder(REQUEST_CODE_MONTHLY, calendar, "每月 " + dayStr + " 號", String.format("%02d:%02d", hour, minute));
             }
-            editor.apply();  // 寫入
-
-            Log.d(TAG, "Have stored in SharedPreferences.");
-
-            // 替換目前 Fragment 為提醒設定頁面
-            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-
-                Log.d(TAG, "Back to SettingFragment.");
-
-                // 創建SettingFragment
-                SettingFragment settingFragment = new SettingFragment();
-                requireActivity().getSupportFragmentManager()
-                        .beginTransaction()
-                        .replace(R.id.fragment_main, settingFragment)
-                        .addToBackStack(null)
-                        .commit();
-            }, 800); // 延遲 800ms 等 Toast 顯示完
-
+        /*    else {
+                updateReminderState(null, null);
+            }   */
+            // 跳回 SettingFragment
+            navigateToSettingFragmentDelayed(800);
         });
+
     }
 
+
+    // 設定 Alarm
     private void scheduleAlarm(Calendar calendar, int requestCode) {
-        Intent intent = new Intent(requireContext(), ReminderReceiver.class);
-        intent.putExtra("reminder_type", requestCode); // 1001=每日, 1002=每週, 1003=每月
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                requireContext(), requestCode, intent, PendingIntent.FLAG_IMMUTABLE);
+        Log.d(TAG, "SettingReminderFragment _ Alarm set at: " + calendar.getTime() + " for requestCode: " + requestCode);
 
         AlarmManager alarmManager = (AlarmManager) requireContext().getSystemService(Context.ALARM_SERVICE);
 
+        // Android 12 (API 31) 以上需要額外權限
+        // 開啟設定允許提醒，才不會讓程式崩潰
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (!alarmManager.canScheduleExactAlarms()) {
+                Log.w(TAG, "SCHEDULE_EXACT_ALARM 權限未授予，導引使用者開啟權限");
+                Intent intent = new Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                intent.setData(android.net.Uri.parse("package:" + requireContext().getPackageName()));
+                startActivity(intent);
+                return;  // 中止 alarm 設定，等使用者授權
+            }
+        }
+
+        // 指定觸發目標接收器 BroadcastReceiver
+        Intent intent = new Intent(requireContext(), ReminderReceiver.class);
+        // 表示提醒的類型，額外資訊（extra）到 Intent 中
+        intent.putExtra("reminder_type", requestCode); // 1001=每日, 1002=每週, 1003=每月
+        // 包裝 Intent，讓系統未來某個時間點可以代替執行 broadcast 操作
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(requireContext(), requestCode, intent, PendingIntent.FLAG_IMMUTABLE);
+
+
         long triggerTime = calendar.getTimeInMillis();
+        // 若時間早於現在，補到下週、下月或明天
         if (triggerTime < System.currentTimeMillis()) {
-            // 若時間早於現在，補到下週、下月或明天
-            if (requestCode == 1001) {
+            if (requestCode == REQUEST_CODE_DAILY) {
                 calendar.add(Calendar.DAY_OF_YEAR, 1);  // 每日
-            } else if (requestCode == 1002) {
+            } else if (requestCode == REQUEST_CODE_WEEKLY) {
                 calendar.add(Calendar.WEEK_OF_YEAR, 1); // 每週
-            } else if (requestCode == 1003) {
+            } else if (requestCode == REQUEST_CODE_MONTHLY) {
                 calendar.add(Calendar.MONTH, 1);        // 每月
             }
             triggerTime = calendar.getTimeInMillis();
         }
 
+        // 根據 Android 版本，正確地設定 Alarm（鬧鐘）來準時觸發通知或任務
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // API 23+
             alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     triggerTime,
@@ -239,5 +228,70 @@ public class SettingReminderFragment extends Fragment {
                     pendingIntent
             );
         }
+    }
+
+    // 設定提醒
+    private void setReminder(int requestCode, Calendar calendar, String modeText, String timeText) {
+        cancelAllAlarms();  // 不允許同時存在多個提醒
+        scheduleAlarm(calendar, requestCode);
+        updateReminderState(modeText, timeText);
+        Toast.makeText(getContext(), "提醒設定成功", Toast.LENGTH_SHORT).show();
+    }
+
+    // 更新提醒狀態
+    private void updateReminderState(@Nullable String mode, @Nullable String time) {
+        SharedPreferences.Editor editor = prefs.edit();
+
+        if (mode != null && time != null) {
+            editor.putString("reminder_mode", mode);
+            editor.putString("reminder_time", time);
+            tvReminderState.setText("提醒時間：" + mode + " " + time);
+        } else {
+            editor.remove("reminder_mode");
+            editor.remove("reminder_time");
+            tvReminderState.setText("提醒時間：尚未設定");
+        }
+
+        editor.apply();
+    }
+
+    // 僅取消 Alarm（不清除資料或畫面）
+    private void cancelAllAlarms() {
+        AlarmManager alarmManager = (AlarmManager) requireContext().getSystemService(Context.ALARM_SERVICE);
+
+        int[] allRequestCodes = {REQUEST_CODE_DAILY, REQUEST_CODE_WEEKLY, REQUEST_CODE_MONTHLY, REQUEST_CODE_TEST};
+
+        for (int code : allRequestCodes) {
+            Intent intent = new Intent(requireContext(), ReminderReceiver.class);
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                    requireContext(), code, intent, PendingIntent.FLAG_IMMUTABLE);
+
+            alarmManager.cancel(pendingIntent);
+            Log.d(TAG, "Canceled alarm for requestCode: " + code);
+        }
+    }
+
+    // 取消 Alarm + 清除資料 + 清除畫面提醒時間
+    private void clearAllReminders() {
+        // 僅取消 Alarm（不清除資料或畫面）
+        cancelAllAlarms();
+        // 更新提醒狀態
+        updateReminderState(null, null);
+
+        // 小提示
+        Toast.makeText(getContext(), "取消所有提醒", Toast.LENGTH_SHORT).show();
+    }
+
+    // 切換 Fragment
+    private void navigateToSettingFragmentDelayed(long delayMillis) {
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            Log.d(TAG, "Back to SettingFragment.");
+            SettingFragment settingFragment = new SettingFragment();
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_main, settingFragment)
+                    .addToBackStack(null)
+                    .commit();
+        }, delayMillis);
     }
 }

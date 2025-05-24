@@ -116,7 +116,7 @@
             android:textSize="20sp" />
 
         <Button
-            android:id="@+id/btn_reminder_cancle"
+            android:id="@+id/btn_reminder_cancel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"

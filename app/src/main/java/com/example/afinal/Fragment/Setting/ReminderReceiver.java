@@ -15,16 +15,26 @@ import androidx.core.app.NotificationCompat;
 import com.example.afinal.R;
 
 import java.util.Calendar;
+import static com.example.afinal.Fragment.Setting.Constants.*;
 
 
 public class ReminderReceiver extends BroadcastReceiver {
+    private static final String TAG = "ReminderDebug";
+
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.d("ReminderReceiver", "Alarm received!");
+        //
+        int type = intent.getIntExtra("reminder_type", -1);
+        Log.d(TAG, "reminder_type = " + type);
 
+        if (type == REQUEST_CODE_TEST) {
+            Log.d(TAG, "ReminderReceiver _ Testing!");
+        }
+        //
+        Log.d(TAG, "Receiver triggered at: " + System.currentTimeMillis());
         String channelId = "reminder_channel";
         String title = "記帳提醒";
-        String message = "再不記帳，我就要開始跳舞了喔！";
+        String message = "再不記帳，我就要跳舞了喔！";
 
         NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
 
@@ -42,20 +52,23 @@ public class ReminderReceiver extends BroadcastReceiver {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true);
 
-        manager.notify(1001, builder.build());
+        manager.notify(REQUEST_CODE_DAILY, builder.build());
 
         // 讀取提醒類型並重新排程
-        int type = intent.getIntExtra("reminder_type", -1);
+        //int type = intent.getIntExtra("reminder_type", -1);
+
+        Log.d(TAG, "reminder_type = " + type);  // 補充：印出類型以利偵錯
+
         Calendar calendar = Calendar.getInstance();
 
         switch (type) {
-            case 1001: // 每日
+            case REQUEST_CODE_DAILY: // 每日
                 calendar.add(Calendar.DAY_OF_YEAR, 1);
                 break;
-            case 1002: // 每週
+            case REQUEST_CODE_WEEKLY: // 每週
                 calendar.add(Calendar.WEEK_OF_YEAR, 1);
                 break;
-            case 1003: // 每月
+            case REQUEST_CODE_MONTHLY: // 每月
                 calendar.add(Calendar.MONTH, 1);
                 break;
             default:
