@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">final</string>
+    <string name="title_activity_maps">MapsActivity</string>
+
+    <string name="hello_blank_fragment">Hello Blank Fragment</string>
+
+    <string name="select_year">選擇年份</string>
+    <string name="select_month">選擇月份</string>
+</resources>

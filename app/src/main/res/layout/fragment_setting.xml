@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <!-- 圓形 -->
+    <View
+        android:id="@+id/view_avatar"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:layout_marginTop="24dp"
+        android:background="@drawable/circle_line"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 頭像 -->
+
+    <!-- 相機圖形 -->
+    <ImageView
+        android:id="@+id/iv_avatar"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:src="@drawable/ic_head_svg"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.498"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/view_avatar" />
+
+    <ImageView
+        android:id="@+id/iv_avatar_camera"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/circle_background"
+        app:layout_constraintBottom_toBottomOf="@id/view_avatar"
+        app:layout_constraintEnd_toEndOf="@id/view_avatar" />
+
+    <!-- 相機按鈕 -->
+    <ImageButton
+        android:id="@+id/btn_camera"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="上傳頭像"
+        android:src="@drawable/ic_camera_svg"
+        app:layout_constraintBottom_toBottomOf="@id/view_avatar"
+        app:layout_constraintEnd_toEndOf="@id/view_avatar" />
+
+    <!-- 暱稱 -->
+    <TextView
+        android:id="@+id/tv_nickname"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:hint="Nickname"
+        android:textAlignment="center"
+        android:textColor="#000000"
+        android:textSize="20sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/view_avatar" />
+
+    <!-- 修改按鈕 -->
+    <ImageButton
+        android:id="@+id/btn_edit"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="上傳暱稱"
+        android:src="@drawable/ic_edit_svg"
+        app:layout_constraintStart_toEndOf="@+id/tv_nickname"
+        app:layout_constraintTop_toTopOf="@+id/tv_nickname" />
+
+    <!-- Reminder -->
+    <TextView
+        android:id="@+id/tv_reminder_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:textColor="#000000"
+        android:textSize="20sp"
+        android:hint="提醒時間："
+        app:layout_constraintBottom_toTopOf="@+id/tv_account_switch"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_nickname" />
+
+    <!-- 功能選項區塊 -->
+    <TextView
+        android:id="@+id/tv_account_switch"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/textview_border"
+        android:padding="16dp"
+        android:text="帳號切換(彈跳視窗，輸入/切換其他帳號 )"
+        android:textColor="#000000"
+        android:textSize="20sp"
+        app:layout_constraintBottom_toTopOf="@+id/tv_classification"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/tv_classification" />
+
+    <TextView
+        android:id="@+id/tv_classification"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/textview_border"
+        android:padding="16dp"
+        android:text="分類管理"
+        android:textAlignment="textStart"
+        android:textColor="#000000"
+        android:textSize="20sp"
+        app:layout_constraintBottom_toTopOf="@+id/tv_accounting_reminder"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/tv_accounting_reminder" />
+
+    <TextView
+        android:id="@+id/tv_accounting_reminder"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/textview_border"
+        android:padding="16dp"
+        android:text="記帳提醒(Setting Reminder)"
+        android:textColor="#000000"
+        android:textSize="20sp"
+        app:layout_constraintBottom_toTopOf="@+id/tv_share_accounting"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/tv_share_accounting" />
+
+    <TextView
+        android:id="@+id/tv_share_accounting"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/textview_border"
+        android:padding="16dp"
+        android:text="共享記帳(選擇新建或既有群組，產生加入群組的連結或QR-Code)"
+        android:textColor="#000000"
+        android:textSize="20sp"
+        app:layout_constraintBottom_toTopOf="@+id/tv_reset_accounting_setting"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@+id/tv_reset_accounting_setting" />
+
+    <TextView
+        android:id="@+id/tv_reset_accounting_setting"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/textview_border"
+        android:padding="16dp"
+        android:text="重置記帳設定"
+        android:textColor="#000000"
+        android:textSize="20sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

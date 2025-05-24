@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- 群組標題 -->
+        <TextView
+            android:id="@+id/tvGroupTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="群組名稱"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="16dp" />
+
+        <!-- 群組照片 -->
+        <ImageView
+            android:id="@+id/imgGroupPhoto"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_gravity="center"
+            android:scaleType="centerCrop"
+            android:src="@drawable/group_default_photo"
+            android:background="#DDDDDD" />
+
+        <!-- 編輯照片 -->
+        <TextView
+            android:id="@+id/btnEditPhoto"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="編輯照片"
+            android:textColor="#354F92"
+            android:layout_gravity="center"
+            android:paddingTop="4dp" />
+
+        <!-- 編輯群組名稱 -->
+        <EditText
+            android:id="@+id/etGroupName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="群組名稱"
+            android:textSize="18sp"
+            android:layout_marginTop="12dp"
+            android:background="@android:drawable/edit_text" />
+
+        <!-- 成員列表標題 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="群組成員"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:layout_marginTop="24dp" />
+
+        <!-- 成員容器 -->
+        <LinearLayout
+            android:id="@+id/memberContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp" />
+
+        <!-- 邀請按鈕 -->
+        <Button
+            android:id="@+id/btnInviteMember"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="邀請新成員"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="#354F92"
+            android:textColor="@android:color/white" />
+
+        <Button
+            android:id="@+id/btnSaveSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="儲存設定"
+            android:layout_marginTop="20dp"
+            android:backgroundTint="#388E3C"
+            android:textColor="@android:color/white" />
+
+        <!-- 退出群組按鈕 -->
+        <Button
+            android:id="@+id/btnExitGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="退出群組"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="#D32F2F"
+            android:textColor="@android:color/white" />
+
+    </LinearLayout>
+</ScrollView>

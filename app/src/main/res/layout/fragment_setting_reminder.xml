@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="30dp">
+
+        <!-- Reminder -->
+        <TextView
+            android:id="@+id/tv_reminder_state"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:padding="16dp"
+            android:textColor="#000000"
+            android:textSize="20sp"
+            android:hint="目前提醒時間："/>
+
+        <!-- 提醒類型選擇 -->
+        <RadioGroup
+            android:id="@+id/reminder_type"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp">
+
+            <RadioButton
+                android:id="@+id/rb_daily"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="每日提醒"
+                android:textSize="20sp" />
+
+            <RadioButton
+                android:id="@+id/rb_weekly"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="每週提醒"
+                android:textSize="20sp" />
+
+            <RadioButton
+                android:id="@+id/rb_monthly"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="每月提醒"
+                android:textSize="20sp" />
+        </RadioGroup>
+
+        <!-- 每日提醒時間選擇 -->
+        <TimePicker
+            android:id="@+id/time_picker_daily"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:timePickerMode="spinner"
+            android:visibility="gone" />
+
+        <!-- 每週提醒 -->
+        <LinearLayout
+            android:id="@+id/reminder_weekly"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Spinner
+                android:id="@+id/spinner_weekday"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:entries="@array/weekdays" />
+
+            <TimePicker
+                android:id="@+id/time_picker_weekly"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:timePickerMode="spinner" />
+        </LinearLayout>
+
+        <!-- 每月提醒 -->
+        <LinearLayout
+            android:id="@+id/reminder_monthly"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <EditText
+                android:id="@+id/edit_day_of_month"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="請輸入幾號（1~31）"
+                android:inputType="number"
+                android:textSize="20sp" />
+
+            <TimePicker
+                android:id="@+id/time_picker_monthly"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:timePickerMode="spinner" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_reminder_confirm"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="30dp"
+            android:backgroundTint="@color/lightPurple"
+            android:text="確定"
+            android:textSize="20sp" />
+
+        <Button
+            android:id="@+id/btn_reminder_cancle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="30dp"
+            android:backgroundTint="@color/lightPurple"
+            android:text="取消"
+            android:textSize="20sp" />
+
+    </LinearLayout>
+</ScrollView>
