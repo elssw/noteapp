@@ -45,12 +45,19 @@ public class ReminderReceiver extends BroadcastReceiver {
             manager.createNotificationChannel(channel);
         }
 
+        // 點擊通知後要開啟的APP畫面
+        Intent openIntent = new Intent(context, com.example.afinal.MainActivity2.class);
+        openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        PendingIntent contentIntent = PendingIntent.getActivity(
+                context, 0, openIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_head_svg) // 替換為你實際的 icon
                 .setContentTitle(title)
                 .setContentText(message)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true);
+                .setAutoCancel(true)
+                .setContentIntent(contentIntent);
 
         manager.notify(REQUEST_CODE_DAILY, builder.build());
 

@@ -33,12 +33,15 @@ import androidx.fragment.app.Fragment;
 
 import com.example.afinal.Fragment.Setting.SettingReminderFragment;
 import com.example.afinal.R;
+import com.example.afinal.SignInActivity;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.yalantis.ucrop.UCrop;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+
+import static com.example.afinal.Fragment.Setting.Constants.*;
 
 public class SettingFragment extends Fragment {
 
@@ -47,40 +50,20 @@ public class SettingFragment extends Fragment {
     private TextView tvNickname;
     private TextView tvReminderAccounting;
     private TextView tvReminderState;
+    private TextView tvAccountSwitch;
 
     // 儲存使用者偏好設定
     private SharedPreferences prefs;
 
-    private static final String PREF_NAME = "setting_prefs";
+    // 與 SettingReminderFragment 之 PREF_SETTING 相同
+    private static final String PREF_SETTING = "setting_prefs";
     private static final String KEY_NICKNAME = "nickname";
     private static final String KEY_AVATAR_URI = "avatar_uri";
-    private static final String PREF_REMINDER_STATE = "reminder_state_prefs";
 
     // 拍照後儲存相片的 Uri 路徑
     private Uri cameraImageUri;
 
     private static final String TAG = "SettingDebug";
-
-    private final ActivityResultLauncher<Intent> imagePickerLauncher =
-            //註冊從相簿選擇圖片的處理器
-            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (result.getResultCode() == getActivity().RESULT_OK && result.getData() != null) {
-                    // 取得圖片的 Uri
-                    Uri imageUri = result.getData().getData();
-                    if (imageUri != null) {
-                        // 儲存圖片路徑到 SharedPreferences
-                        prefs.edit().putString(KEY_AVATAR_URI, imageUri.toString()).apply();
-                        try {
-                            // 讀取並顯示圖片
-                            loadAvatar(imageUri);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                            Toast.makeText(getContext(), "圖片載入失敗", Toast.LENGTH_SHORT).show();
-                        }
-
-                    }
-                }
-            });
 
     @Nullable
     @Override
@@ -95,12 +78,14 @@ public class SettingFragment extends Fragment {
         btnEdit = view.findViewById(R.id.btn_edit);
         tvReminderAccounting = view.findViewById(R.id.tv_accounting_reminder);
         tvReminderState = view.findViewById(R.id.tv_reminder_state);
+        tvAccountSwitch=view.findViewById(R.id.tv_account_switch);
 
-        prefs = requireContext().getSharedPreferences(PREF_NAME, 0);
+        prefs = requireContext().getSharedPreferences(PREF_SETTING, 0);
 
 
         // 載入頭像
         String uriStr = prefs.getString(KEY_AVATAR_URI, null);
+        Log.d(TAG, "prefs URI = " + uriStr);
         if (uriStr != null && !uriStr.isEmpty()) {
             Log.d(TAG, "uriStr");
 
@@ -117,18 +102,16 @@ public class SettingFragment extends Fragment {
             }
         } else {
             // 若 uriStr 為 null 或空字串，給預設圖
+            Log.d(TAG, "No, ic_head_svg");
             ivAvatar.setImageResource(R.drawable.ic_head_svg);
         }
 
 
         // 顯示底部選單，選擇相簿/相機
         btnCamera.setOnClickListener(v -> {
+            Log.d(TAG, "btnCamera");
             showBottomSheet();
         });
-
-
-
-
 
 
         // Edit 圖示功能：修改暱稱
@@ -154,11 +137,17 @@ public class SettingFragment extends Fragment {
         String savedName = prefs.getString(KEY_NICKNAME, "暱稱");
         tvNickname.setText(savedName);
 
+
         // 提醒狀態
-        prefs = requireContext().getSharedPreferences(PREF_REMINDER_STATE, 0);
-        String mode = prefs.getString("reminder_mode", "尚未設定");
-        String time = prefs.getString("reminder_time", "");
+        String mode = prefs.getString(KEY_REMINDER_MODE, "尚未設定");
+        String time = prefs.getString(KEY_REMINDER_TIME, "");
         tvReminderState.setText("提醒時間：" + mode + " " + time);
+
+        // 帳號切換
+        tvAccountSwitch.setOnClickListener(v-> {
+            accountSwitch();
+        });
+
 
         // 記帳提醒
         tvReminderAccounting.setOnClickListener(v -> {
@@ -173,9 +162,23 @@ public class SettingFragment extends Fragment {
                     .replace(R.id.fragment_main, reminderFragment) // R.id.fragment_container 替換成實際 MainActivity的 FrameLayout ID
                     .addToBackStack(null) // 加入返回堆疊
                     .commit();
+
         });
         return view;
     }
+
+    // 從相簿選取圖片後該做什麼？
+    private final ActivityResultLauncher<Intent> imagePickerLauncher =
+            // 註冊從相簿選擇圖片的處理器
+            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == getActivity().RESULT_OK && result.getData() != null) {
+                    // 取得圖片的 Uri
+                    Uri imageUri = result.getData().getData();
+                    if (imageUri != null) {
+                        startCrop(imageUri);
+                    }
+                }
+            });
 
     // BottomSheet: from photo or camera
     private void showBottomSheet() {
@@ -249,23 +252,12 @@ public class SettingFragment extends Fragment {
             if (requestCode == 1001 && data != null) {
                 Log.d(TAG, "1001 photo get, cutting");
                 Uri sourceUri = data.getData();
-                Uri destUri = Uri.fromFile(new File(requireContext().getCacheDir(), "cropped.jpg"));
-                UCrop.of(sourceUri, destUri)
-                        .withAspectRatio(1, 1)
-                        .withMaxResultSize(600, 600)
-                        .withOptions(getCropOptions())
-                        .start(requireContext(), this);
+                startCrop(sourceUri);
 
             } else if (requestCode == 1002) {
                 Log.d(TAG, "1002 photo get, cutting");
                 Uri sourceUri = cameraImageUri;
-                Uri destUri = Uri.fromFile(new File(requireContext().getCacheDir(), "cropped.jpg"));
-                UCrop.of(sourceUri, destUri)
-                        .withAspectRatio(1, 1)
-                        .withMaxResultSize(600, 600)
-                        .withOptions(getCropOptions())
-                        .start(requireContext(), this);
-
+                startCrop(sourceUri);
             } else if (requestCode == UCrop.REQUEST_CROP && data != null) {
                 Uri resultUri = UCrop.getOutput(data);
                 Log.d(TAG, "cut finished, URI = " + resultUri);
@@ -274,6 +266,7 @@ public class SettingFragment extends Fragment {
                         Bitmap square = loadBitmapFromUri(resultUri);
                         Bitmap circle = cropToCircle(square);
                         ivAvatar.setImageBitmap(circle);
+
                         Uri saved = saveBitmapToCache(circle);
                         prefs.edit().putString(KEY_AVATAR_URI, saved.toString()).apply();
                         Log.d(TAG, "cut finished, store to " + saved.toString());
@@ -286,6 +279,16 @@ public class SettingFragment extends Fragment {
         }else {
             Log.w(TAG, "onActivityResult: false");
         }
+    }
+
+    // 開始裁切
+    private void startCrop(Uri sourceUri) {
+        Uri destUri = Uri.fromFile(new File(requireContext().getCacheDir(), "cropped.jpg"));
+        UCrop.of(sourceUri, destUri)
+                .withAspectRatio(1, 1)
+                .withMaxResultSize(600, 600)
+                .withOptions(getCropOptions())
+                .start(requireContext(), this);
     }
 
     // 裁切樣式設定函式
@@ -313,6 +316,11 @@ public class SettingFragment extends Fragment {
     private Bitmap cropToCircle(Bitmap source) {
         Log.d(TAG, "cropToCircle");
 
+        // 修正關鍵：避免硬體加速 bitmap 導致崩潰
+        if (source.getConfig() == Bitmap.Config.HARDWARE) {
+            source = source.copy(Bitmap.Config.ARGB_8888, true);
+        }
+
         int size = Math.min(source.getWidth(), source.getHeight());
         Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
 
@@ -336,11 +344,26 @@ public class SettingFragment extends Fragment {
     private Uri saveBitmapToCache(Bitmap bitmap) throws IOException {
         Log.d(TAG, "saveBitmapToCache");
 
-        File file = new File(requireContext().getCacheDir(), "avatar_cropped.jpg");
+        File file = new File(requireContext().getCacheDir(), "avatar_cropped.png");
         FileOutputStream out = new FileOutputStream(file);
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
+        bitmap.compress(Bitmap.CompressFormat.PNG, 90, out);
         out.close();
         return Uri.fromFile(file);
+    }
+
+    // 切換帳號介面
+    private void  accountSwitch(){
+        startActivity(new Intent(requireActivity(), SignInActivity.class));
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        Log.d(TAG, "onResume: update reminder time");
+
+        String mode = prefs.getString(KEY_REMINDER_MODE, "尚未設定");
+        String time = prefs.getString(KEY_REMINDER_TIME, "");
+        tvReminderState.setText("提醒時間：" + mode + " " + time);
     }
 
 }

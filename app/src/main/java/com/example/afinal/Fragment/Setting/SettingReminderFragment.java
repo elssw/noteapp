@@ -48,7 +48,8 @@ public class SettingReminderFragment extends Fragment {
     // 儲存使用者偏好設定
     private SharedPreferences prefs;
 
-    private static final String PREF_REMINDER_STATE = "reminder_state_prefs";
+    // 與 SettingFragment 之 PREF_SETTING 相同
+    private static final String PREF_SETTING= "setting_prefs";
     // Example Tag for filtering
     private static final String TAG = "ReminderDebug";
 
@@ -72,9 +73,9 @@ public class SettingReminderFragment extends Fragment {
         tvReminderState = view.findViewById(R.id.tv_reminder_state);
 
         // Reminder State
-        prefs = requireContext().getSharedPreferences(PREF_REMINDER_STATE, 0);
-        String mode = prefs.getString("reminder_mode", "尚未設定");
-        String time = prefs.getString("reminder_time", "");
+        prefs = requireContext().getSharedPreferences(PREF_SETTING, 0);
+        String mode = prefs.getString(KEY_REMINDER_MODE, "尚未設定");
+        String time = prefs.getString(KEY_REMINDER_TIME, "");
         tvReminderState.setText("提醒時間：" + mode + " " + time);
 
         // 授予通知權限
@@ -243,12 +244,12 @@ public class SettingReminderFragment extends Fragment {
         SharedPreferences.Editor editor = prefs.edit();
 
         if (mode != null && time != null) {
-            editor.putString("reminder_mode", mode);
-            editor.putString("reminder_time", time);
+            editor.putString(KEY_REMINDER_MODE, mode);
+            editor.putString(KEY_REMINDER_TIME, time);
             tvReminderState.setText("提醒時間：" + mode + " " + time);
         } else {
-            editor.remove("reminder_mode");
-            editor.remove("reminder_time");
+            editor.remove(KEY_REMINDER_MODE);
+            editor.remove(KEY_REMINDER_TIME);
             tvReminderState.setText("提醒時間：尚未設定");
         }
 
