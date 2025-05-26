@@ -19,6 +19,12 @@
         android:theme="@style/Theme.Final"
         tools:targetApi="31">
         <activity
+            android:name=".GroupCharge"
+            android:exported="false" />
+        <activity
+            android:name=".GroupDetail"
+            android:exported="false" />
+        <activity
             android:name=".SignUpActivity"
             android:exported="false" />
         <activity
@@ -39,15 +45,16 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCLk_Qv6hC73teDEcVk4A_HmmTjXDkXo78" />
 
-        <activity android:name="com.yalantis.ucrop.UCropActivity"
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
-
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
         <activity
             android:name=".MainActivity2"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
@@ -58,7 +65,7 @@
             android:windowSoftInputMode="adjustResize" />
 
         <receiver
-            android:name="com.example.afinal.Fragment.Setting.ReminderReceiver"
+            android:name=".Fragment.Setting.ReminderReceiver"
             android:exported="true" />
     </application>
 

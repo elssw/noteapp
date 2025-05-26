@@ -1,6 +1,7 @@
 package com.example.afinal.Fragment;
 
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
@@ -19,6 +20,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.example.afinal.GroupDetail;
 import com.example.afinal.R;
 
 import java.util.ArrayList;
@@ -180,14 +182,21 @@ public class GroupFragment extends Fragment {
                         .commit();
             } else {
                 Toast.makeText(context, "進入 " + groupName, Toast.LENGTH_SHORT).show();
-                SingleGroupManageFragment fragment = SingleGroupManageFragment.newInstance(groupName);
-                requireActivity().getSupportFragmentManager()
-                        .beginTransaction()
-                        .replace(R.id.fragment_main, fragment)
-                        .addToBackStack(null)
-                        .commit();
+                // 🔽 原本跳到群組管理 Fragment
+                // SingleGroupManageFragment fragment = SingleGroupManageFragment.newInstance(groupName);
+                // requireActivity().getSupportFragmentManager()
+                //         .beginTransaction()
+                //         .replace(R.id.fragment_main, fragment)
+                //         .addToBackStack(null)
+                //         .commit();
+
+                // ✅ 改成跳到分帳情況 Activity
+                Intent intent = new Intent(context, GroupDetail.class);
+                intent.putExtra("group_name", groupName); // 若你要傳值可加上
+                startActivity(intent);
             }
         });
+
 
         groupContainer.addView(rowLayout);
     }
