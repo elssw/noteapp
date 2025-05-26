@@ -22,6 +22,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+
     <!-- 原本的 locate EditText，改 Start 約束指向 btnBack -->
     <EditText
         android:id="@+id/locate"
@@ -54,23 +55,52 @@
         android:id="@+id/note"
         android:layout_width="0dp"
         android:layout_height="30dp"
+        android:background="#444444"
         android:gravity="center"
         android:text="添加備註"
         android:textColor="#FFFFFF"
-        android:background="#444444"
-        app:layout_constraintBottom_toTopOf="@+id/tvAmountDisplay"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintBottom_toTopOf="@+id/amountDateRow"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
 
-    <TextView
-        android:id="@+id/tvAmountDisplay"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/amountDateRow"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="NT$0"
-        android:textSize="24sp"
-        android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintBottom_toTopOf="@+id/footerContainer"/>
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@+id/footerContainer">
+
+        <TextView
+            android:id="@+id/tvAmountDisplay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="NT$0"
+            android:textColor="#000000"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            app:layout_constraintBaseline_toBaselineOf="@+id/tvDateDisplay"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <TextView
+            android:id="@+id/tvDateDisplay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="4dp"
+            android:text="2025-05-26"
+            android:textColor="@android:color/holo_blue_dark"
+            android:textSize="12sp"
+            app:layout_constraintBaseline_toBaselineOf="@+id/tvAmountDisplay"
+            app:layout_constraintEnd_toEndOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+
 
     <!-- 底部淺灰背景容器，包含鍵盤 -->
     <LinearLayout

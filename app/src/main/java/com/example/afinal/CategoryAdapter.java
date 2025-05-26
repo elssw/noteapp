@@ -1,7 +1,6 @@
 package com.example.afinal;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,54 +15,48 @@ import com.example.afinal.model.Category;
 import java.util.List;
 
 public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.VH> {
-    private final List<Category> data;
+    public interface OnItemClickListener {
+        void onItemClick(Category category);
+    }
+
     private final Context context;
-    private int selectedPosition = RecyclerView.NO_POSITION;
+    private final List<Category> data;
+    private OnItemClickListener listener;
 
     public CategoryAdapter(Context context, List<Category> data) {
         this.context = context;
         this.data = data;
     }
 
+    public void setOnItemClickListener(OnItemClickListener l) {
+        this.listener = l;
+    }
+
     static class VH extends RecyclerView.ViewHolder {
-        ImageView iv;
-        TextView tv;
+        ImageView ivIcon;
+        TextView tvName;
         VH(@NonNull View itemView) {
             super(itemView);
-            iv = itemView.findViewById(R.id.ivIcon);
-            tv = itemView.findViewById(R.id.tvName);
+            ivIcon = itemView.findViewById(R.id.ivCategoryIcon);
+            tvName = itemView.findViewById(R.id.tvCategoryName);
         }
     }
 
     @NonNull @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext())
+        View v = LayoutInflater.from(context)
                 .inflate(R.layout.item_category, parent, false);
-        VH vh = new VH(v);
-        v.setOnClickListener(view -> {
-            int pos = vh.getAdapterPosition();
-            if (pos == RecyclerView.NO_POSITION) return;
-            int old = selectedPosition;
-            selectedPosition = pos;
-            notifyItemChanged(old);
-            notifyItemChanged(selectedPosition);
-        });
-        return vh;
+        return new VH(v);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull VH holder, int position) {
-        Category cat = data.get(position);
-        holder.iv.setImageResource(cat.getIconResId());
-        holder.tv.setText(cat.getName());
-
-        //選到ㄉ顏色提示
-        if (position == selectedPosition) {
-            holder.itemView.setBackgroundColor(Color.parseColor("#D0EFFF"));
-        } else {
-            holder.itemView.setBackgroundColor(Color.parseColor("#00000000"));
-            ;
-        }
+    public void onBindViewHolder(@NonNull VH h, int pos) {
+        Category c = data.get(pos);
+        h.ivIcon.setImageResource(c.getIconResId());
+        h.tvName.setText(c.getName());
+        h.itemView.setOnClickListener(v -> {
+            if (listener != null) listener.onItemClick(c);
+        });
     }
 
     @Override

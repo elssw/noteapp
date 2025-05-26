@@ -16,14 +16,15 @@ public class RecordAdapter extends RecyclerView.Adapter<RecordAdapter.VH> {
     public RecordAdapter(List<Record> data) { this.data = data; }
 
     static class VH extends RecyclerView.ViewHolder {
-        ImageView iv;
-        TextView tvPrice, tvNote, tvTime;
+        ImageView ivIcon;
+        TextView tvPrice, tvCategoryName, tvNote, tvDate;
         VH(@NonNull View itemView) {
             super(itemView);
-            iv      = itemView.findViewById(R.id.ivCategoryIcon);
-            tvPrice = itemView.findViewById(R.id.tvPrice);
-            tvNote  = itemView.findViewById(R.id.tvNote);
-            tvTime  = itemView.findViewById(R.id.tvTime);
+            ivIcon          = itemView.findViewById(R.id.ivCategoryIcon);
+            tvPrice         = itemView.findViewById(R.id.tvPrice);
+            tvCategoryName  = itemView.findViewById(R.id.tvCategoryName);
+            tvNote          = itemView.findViewById(R.id.tvNote);
+            tvDate          = itemView.findViewById(R.id.tvTime);
         }
     }
 
@@ -34,15 +35,14 @@ public class RecordAdapter extends RecyclerView.Adapter<RecordAdapter.VH> {
         return new VH(v);
     }
 
-    @Override
-    public void onBindViewHolder(@NonNull VH h, int pos) {
+    @Override public void onBindViewHolder(@NonNull VH h, int pos) {
         Record r = data.get(pos);
-        h.iv.setImageResource(r.getIconResId());
+        h.ivIcon.setImageResource(r.getIconResId());
         h.tvPrice.setText(r.getPrice());
-        h.tvNote .setText(r.getNote());
-        h.tvTime .setText(r.getTime());
+        h.tvCategoryName.setText(r.getCategoryName());
+        h.tvNote.setText(r.getNote());
+        h.tvDate.setText(r.getDate());
     }
 
-    @Override
-    public int getItemCount() { return data.size(); }
+    @Override public int getItemCount() { return data.size(); }
 }

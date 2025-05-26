@@ -1,14 +1,13 @@
 package com.example.afinal.Fragment;
 
+import android.app.AlertDialog;
 import android.content.Intent;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
-import android.widget.Spinner;
+import android.widget.Button;
+import android.widget.NumberPicker;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -23,18 +22,22 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.afinal.Charge;
 import com.example.afinal.R;
 import com.example.afinal.RecordAdapter;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.example.afinal.model.Record;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
 public class UserFragment extends Fragment {
-
-    private Spinner spinnerYear, spinnerMonth;
-    private RecyclerView rvRecords;
+    private static final int REQ_CHARGE = 100;
+    private MaterialButton btnMonthPicker;
     private TextView tvOutcome;
+    private RecyclerView rvRecords;
+    private int selectedYear, selectedMonth;
+
+    private final List<Record> allRecords = new ArrayList<>();
 
     @Nullable @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -46,91 +49,85 @@ public class UserFragment extends Fragment {
     @Override public void onViewCreated(@NonNull View view,
                                         @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
-        // Edge-to-edge padding
-        ViewCompat.setOnApplyWindowInsetsListener(view.findViewById(R.id.main),
-                (v, insets) -> {
-                    Insets b = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                    v.setPadding(b.left, b.top, b.right, b.bottom);
+        ViewCompat.setOnApplyWindowInsetsListener(
+                view.findViewById(R.id.main),
+                (v,insets)->{
+                    Insets s=insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                    v.setPadding(s.left,s.top,s.right,s.bottom);
                     return insets;
                 });
 
-        spinnerYear  = view.findViewById(R.id.spinnerYear);
-        spinnerMonth = view.findViewById(R.id.spinnerMonth);
-        tvOutcome    = view.findViewById(R.id.outcome);
+        btnMonthPicker = view.findViewById(R.id.btnMonthPicker);
+        tvOutcome      = view.findViewById(R.id.outcome);
+        rvRecords      = view.findViewById(R.id.rvRecords);
 
-        tvOutcome.setTextColor(Color.RED);
-
-        ArrayAdapter<CharSequence> yearAdapter = ArrayAdapter.createFromResource(
-                requireContext(), R.array.years_array,
-                android.R.layout.simple_spinner_item
-        );
-        yearAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerYear.setAdapter(yearAdapter);
-
-        ArrayAdapter<CharSequence> monthAdapter = ArrayAdapter.createFromResource(
-                requireContext(), R.array.months_array,
-                android.R.layout.simple_spinner_item
-        );
-        monthAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerMonth.setAdapter(monthAdapter);
+        rvRecords.setLayoutManager(new LinearLayoutManager(requireContext()));
 
         Calendar cal = Calendar.getInstance();
-        String thisYear  = String.valueOf(cal.get(Calendar.YEAR));
-        String thisMonth = String.format("%02d", cal.get(Calendar.MONTH) + 1);
-        spinnerYear.setSelection(yearAdapter.getPosition(thisYear));
-        spinnerMonth.setSelection(monthAdapter.getPosition(thisMonth));
+        selectedYear  = cal.get(Calendar.YEAR);
+        selectedMonth = cal.get(Calendar.MONTH)+1;
+        btnMonthPicker.setText(String.format("%d-%02d", selectedYear, selectedMonth));
 
-        AdapterView.OnItemSelectedListener listener =
-                new AdapterView.OnItemSelectedListener() {
-                    @Override public void onItemSelected(AdapterView<?> p, View v,
-                                                         int pos, long id) {
-                        loadTransactions(
-                                spinnerYear.getSelectedItem().toString(),
-                                spinnerMonth.getSelectedItem().toString()
-                        );
-                    }
-                    @Override public void onNothingSelected(AdapterView<?> p) {}
-                };
-        spinnerYear.setOnItemSelectedListener(listener);
-        spinnerMonth.setOnItemSelectedListener(listener);
+        btnMonthPicker.setOnClickListener(v -> showMonthPickerDialog());
 
         FloatingActionButton fab = view.findViewById(R.id.fabAdd);
         fab.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), Charge.class))
         );
 
-        rvRecords = view.findViewById(R.id.rvRecords);
-        rvRecords.setLayoutManager(new LinearLayoutManager(requireContext()));
 
-        loadTransactions(thisYear, thisMonth);
+        allRecords.add(new Record(R.drawable.ic_add,"NT$123","超難吃","2025-05-17","午餐"));
+        allRecords.add(new Record(R.drawable.ic_add,"NT$ 45","太快","2025-05-03","交通"));
+        refreshList();
     }
 
-    private void loadTransactions(String year, String month) {
-        List<Record> all = new ArrayList<>();
-        all.add(new Record(R.drawable.ic_add, "NT$123", "午餐", "2025-05-17 12:34"));
-        all.add(new Record(R.drawable.ic_add, "NT$ 45", "公車", "2025-03-17 08:10"));
-        all.add(new Record(R.drawable.ic_add, "NT$200", "電影", "2025-05-16 20:20"));
-        all.add(new Record(R.drawable.ic_add, "NT$350", "購物", "2025-05-15 15:45"));
-        all.add(new Record(R.drawable.ic_add, "NT$300", "早餐", "2025-04-10 07:20"));
-        all.add(new Record(R.drawable.ic_add, "NT$350", "購物", "2025-05-15 15:45"));
+    private void showMonthPickerDialog(){
+        View dv = getLayoutInflater().inflate(R.layout.dialog_month_picker,null);
+        NumberPicker y = dv.findViewById(R.id.yearPicker);
+        NumberPicker m = dv.findViewById(R.id.monthPicker);
+        int cy=Calendar.getInstance().get(Calendar.YEAR);
+        y.setMinValue(cy-10); y.setMaxValue(cy+10); y.setValue(selectedYear);
+        m.setMinValue(1); m.setMaxValue(12); m.setValue(selectedMonth);
 
-        String prefix = year + "-" + month;  // e.g. "2025-05"
+        AlertDialog dlg = new AlertDialog.Builder(requireContext())
+                .setView(dv).create();
+        dv.findViewById(R.id.btnCancel).setOnClickListener(v->dlg.dismiss());
+        dv.findViewById(R.id.btnOK).setOnClickListener(v->{
+            selectedYear  = y.getValue();
+            selectedMonth = m.getValue();
+            btnMonthPicker.setText(String.format("%d-%02d", selectedYear, selectedMonth));
+            refreshList();
+            dlg.dismiss();
+        });
+        dlg.show();
+    }
+
+    private void refreshList(){
+        String prefix = String.format("%d-%02d", selectedYear, selectedMonth);
         List<Record> filtered = new ArrayList<>();
         double sum = 0;
-        for (Record r : all) {
-            if (r.getTime().startsWith(prefix)) {
+        for(Record r: allRecords){
+            if(r.getDate().startsWith(prefix)){
                 filtered.add(r);
-                String p = r.getPrice().replaceAll("[^\\d.]", "");
-                if (!p.isEmpty()) {
-                    sum += Double.parseDouble(p);
-                }
+                String p = r.getPrice().replaceAll("[^\\d.]","");
+                if(!p.isEmpty()) sum += Double.parseDouble(p);
             }
         }
-
         rvRecords.setAdapter(new RecordAdapter(filtered));
+        tvOutcome.setTextColor(0xFFFF0000);
+        tvOutcome.setText("本月支出: NT$"+ Math.round(sum));
+    }
 
-        long total = Math.round(sum);
-        tvOutcome.setText("本月支出: NT$" + total);
+    @Override public void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if(req==REQ_CHARGE && res==Charge.RESULT_OK && data!=null){
+            int icon    = data.getIntExtra("iconRes", R.drawable.ic_add);
+            String cat  = data.getStringExtra("categoryName");
+            String price= data.getStringExtra("price");
+            String note = data.getStringExtra("note");
+            String date = data.getStringExtra("date");
+            allRecords.add(new Record(icon, price, note, date, cat));
+            refreshList();
+        }
     }
 }
