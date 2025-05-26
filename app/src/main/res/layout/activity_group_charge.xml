@@ -1,167 +1,316 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FAFAFA"
-    android:padding="20dp">
+    android:padding="16dp"
+    tools:context=".GroupCharge">
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <!-- 左上角的返回鍵 -->
+    <ImageButton
+        android:id="@+id/btnBack"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginTop="6dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="返回"
+        android:src="@drawable/ic_arrow_back"
+        app:layout_constraintBottom_toTopOf="@+id/items"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 原本的 locate EditText，改 Start 約束指向 btnBack -->
+    <EditText
+        android:id="@+id/locate"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="6dp"
+        android:hint="連結位置"
+        android:inputType="text"
+        app:layout_constraintStart_toEndOf="@id/btnBack"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
-        <!-- 返回按鈕 -->
-        <ImageButton
-            android:id="@+id/btnBack"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_gravity="start"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:src="@drawable/ic_arrow_back"
-            android:contentDescription="返回" />
 
-        <!-- 圖片預覽 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="圖片記錄"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp" />
+    <!-- RecyclerView 必须在 locate 下面、note 之上-->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/items"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginEnd="5dp"
+        android:padding="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/note"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/locate" />
 
-        <ImageView
-            android:id="@+id/imgPreview"
-            android:layout_width="match_parent"
-            android:layout_height="180dp"
-            android:layout_marginTop="6dp"
-            android:scaleType="centerCrop"
-            android:background="#E0E0E0"
-            android:contentDescription="點擊以拍照或上傳圖片"
-            android:clickable="true"
-            android:focusable="true" />
+    <TextView
+        android:id="@+id/note"
+        android:layout_width="0dp"
+        android:layout_height="30dp"
+        android:gravity="center"
+        android:text="添加備註"
+        android:textColor="#FFFFFF"
+        android:background="#444444"
+        app:layout_constraintBottom_toTopOf="@+id/tvAmountDisplay"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
-        <!-- 金額輸入 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="輸入總金額"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp" />
+    <TextView
+        android:id="@+id/tvAmountDisplay"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="NT$0"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toTopOf="@+id/footerContainer"/>
 
-        <EditText
-            android:id="@+id/etAmount"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:hint="例如：450"
-            android:inputType="numberDecimal"
-            android:background="@drawable/edittext_bg"
-            android:paddingHorizontal="12dp"
-            android:textSize="18sp"
-            android:layout_marginTop="4dp" />
+    <!-- 底部淺灰背景容器，包含鍵盤 -->
+    <LinearLayout
+        android:id="@+id/footerContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#EEEEEE"
+        android:padding="8dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
 
-        <!-- 備註 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="備註內容"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="16dp" />
-
-        <EditText
-            android:id="@+id/etNote"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:hint="例如：聚餐費用"
-            android:inputType="text"
-            android:background="@drawable/edittext_bg"
-            android:paddingHorizontal="12dp"
-            android:textSize="16sp"
-            android:layout_marginTop="4dp" />
-
-        <!-- 消費日期 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="消費日期"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="16dp" />
-
-        <TextView
-            android:id="@+id/tvDate"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="請選擇日期"
-            android:padding="12dp"
-            android:textSize="16sp"
-            android:background="@drawable/edittext_bg"
-            android:drawableEnd="@android:drawable/ic_menu_my_calendar"
-            android:layout_marginTop="4dp"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <!-- 付款人選擇 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="選擇付款人與金額"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp" />
-
-        <!-- 複選付款人 TextView -->
-        <TextView
-            android:id="@+id/tvSelectPayers"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="請選擇付款人"
-            android:textSize="16sp"
-            android:padding="12dp"
-            android:background="@drawable/edittext_bg"
-            android:drawableEnd="@android:drawable/arrow_down_float"
-            android:layout_marginTop="8dp" />
-
-        <!-- 成員付款金額輸入欄 -->
+        <!-- 第一行: 1,2,3,÷,AC -->
         <LinearLayout
-            android:id="@+id/payerAmountContainer"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="12dp"
-            android:visibility="gone" />
+            android:orientation="horizontal">
 
-        <!-- 分帳對象 -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="選擇要分攤的人"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginTop="20dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/number_1"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:text="1"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
 
-        <com.google.android.flexbox.FlexboxLayout
-            android:id="@+id/memberSelectionContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:padding="8dp"
-            android:background="@drawable/flexbox_bg"
-            app:flexWrap="wrap"
-            app:justifyContent="flex_start" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/number_2"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="2"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
 
-        <!-- 確認按鈕 -->
-        <Button
-            android:id="@+id/btnConfirm"
-            android:layout_width="match_parent"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/number_3"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="3"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/divide"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="÷"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/clear"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="AC"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+        </LinearLayout>
+
+        <!-- 第二行: 4,5,6,*,← -->
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="確認分帳"
-            android:textSize="16sp"
-            android:layout_marginTop="32dp"
-            android:backgroundTint="#2196F3"
-            android:textColor="#FFFFFF" />
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/number_4"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:text="4"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/number_5"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="5"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/number_6"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="6"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/multiply"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="*"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/back"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="←"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+        </LinearLayout>
+
+        <!-- 第三行: 7,8,9,+,圖 -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/number_7"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:text="7"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/number_8"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="8"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/number_9"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="9"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/plus"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="+"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/image"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="圖"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+        </LinearLayout>
+
+        <!-- 第四行: .,0,=,-,OK -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/point"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:text="."
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/number_0"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="0"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/equal"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="="
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/subtract"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="-"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/confirm"
+                android:layout_width="75dp"
+                android:layout_height="50dp"
+                android:layout_marginStart="4dp"
+                android:text="OK"
+                android:backgroundTint="@android:color/white"
+                android:textColor="@android:color/black"
+                app:cornerRadius="5dp" />
+        </LinearLayout>
+
     </LinearLayout>
-</ScrollView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

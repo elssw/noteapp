@@ -73,7 +73,7 @@ public class GroupDetail extends AppCompatActivity {
         listView.setAdapter(adapter);
 
         fabAdd.setOnClickListener(v -> {
-            Intent intent = new Intent(GroupDetail.this, GroupCharge.class);
+            Intent intent = new Intent(GroupDetail.this, GroupCharge2.class);
             startActivityForResult(intent, 100);
         });
     }

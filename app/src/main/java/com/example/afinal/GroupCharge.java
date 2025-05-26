@@ -1,266 +1,244 @@
 package com.example.afinal;
 
-import android.Manifest;
-import android.app.AlertDialog;
-import android.app.DatePickerDialog;
-import android.content.DialogInterface;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.net.Uri;
 import android.os.Bundle;
-import android.provider.MediaStore;
+import android.view.Gravity;
 import android.view.View;
-import android.widget.*;
+import android.widget.EditText;
+import android.widget.TextView;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.annotation.NonNull;
+import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.flexbox.FlexboxLayout;
+import com.example.afinal.model.Category;
 
-import java.io.IOException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Stack;
 
 public class GroupCharge extends AppCompatActivity {
-
-    private ImageView imgPreview;
-    private EditText etAmount, etNote;
-    private LinearLayout payerAmountContainer;
-    private FlexboxLayout memberSelectionContainer;
-    private List<String> members = Arrays.asList("我", "A", "B");
-    private Map<String, EditText> payerInputs = new HashMap<>();
-    private Uri selectedImageUri = null;
-    private boolean[] selectedPayers;
-    private List<String> chosenPayers = new ArrayList<>();
-    private TextView tvSelectPayers;
-    private TextView tvDate;
-    private Calendar selectedDate = Calendar.getInstance();
-
-
-    private final ActivityResultLauncher<Intent> pickImageLauncher =
-            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                    selectedImageUri = result.getData().getData();
-                    try {
-                        Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), selectedImageUri);
-                        imgPreview.setImageBitmap(bitmap);
-                    } catch (IOException e) {
-                        Toast.makeText(this, "圖片讀取失敗", Toast.LENGTH_SHORT).show();
-                    }
-                }
-            });
-
-    private final ActivityResultLauncher<Intent> takePhotoLauncher =
-            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                    Bitmap photo = (Bitmap) result.getData().getExtras().get("data");
-                    imgPreview.setImageBitmap(photo);
-                    selectedImageUri = null;
-                }
-            });
+    private static final int MAX_LEN = 20;
+    private TextView tvAmountDisplay;
+    private TextView tvNote;
+    private StringBuilder amountBuilder = new StringBuilder();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_group_charge);
 
-        imgPreview = findViewById(R.id.imgPreview);
-        etAmount = findViewById(R.id.etAmount);
-        etNote = findViewById(R.id.etNote);
-        payerAmountContainer = findViewById(R.id.payerAmountContainer);
-        memberSelectionContainer = findViewById(R.id.memberSelectionContainer);
-
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-        imgPreview.setOnClickListener(v -> showImageOptions());
 
-        tvDate = findViewById(R.id.tvDate);
-
-        tvDate.setOnClickListener(v -> {
-            int year = selectedDate.get(Calendar.YEAR);
-            int month = selectedDate.get(Calendar.MONTH);
-            int day = selectedDate.get(Calendar.DAY_OF_MONTH);
-
-            new DatePickerDialog(GroupCharge.this, (view, y, m, d) -> {
-                selectedDate.set(y, m, d);
-                tvDate.setText(String.format(Locale.getDefault(), "%04d-%02d-%02d", y, m + 1, d));
-            }, year, month, day).show();
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+            Insets sys = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(sys.left, sys.top, sys.right, sys.bottom);
+            return insets;
         });
 
-        // 初始隱藏付款欄位
-        payerAmountContainer.setVisibility(View.GONE);
+        tvAmountDisplay = findViewById(R.id.tvAmountDisplay);
+        tvAmountDisplay.setText("NT$0");
 
-        // Spinner 初始化
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, members);
+        //備註
+        tvNote = findViewById(R.id.note);
+        tvNote.setOnClickListener(v -> {
+            //置中
+            TextView customTitle = new TextView(GroupCharge.this);
+            customTitle.setText("備註");
+            customTitle.setGravity(Gravity.CENTER);
+            customTitle.setTextSize(20);
 
-        tvSelectPayers = findViewById(R.id.tvSelectPayers);
-        selectedPayers = new boolean[members.size()];
 
-        tvSelectPayers.setOnClickListener(v -> {
-            String[] names = members.toArray(new String[0]);
-            new AlertDialog.Builder(this)
-                    .setTitle("選擇付款人")
-                    .setMultiChoiceItems(names, selectedPayers, (dialog, which, isChecked) -> {
-                        if (isChecked) {
-                            if (!chosenPayers.contains(names[which])) chosenPayers.add(names[which]);
-                        } else {
-                            chosenPayers.remove(names[which]);
+            EditText input = new EditText(GroupCharge.this);
+            input.setHint("請輸入備註");
+
+
+            AlertDialog dialog = new AlertDialog.Builder(GroupCharge.this)
+                    .setCustomTitle(customTitle)
+                    .setView(input)
+                    .setPositiveButton("確定", (d, w) -> {
+                        String text = input.getText().toString().trim();
+                        if (!text.isEmpty()) {
+                            tvNote.setText(text);
                         }
-                    })
-                    .setPositiveButton("確定", (dialog, which) -> {
-                        updatePayerInputFields();
                     })
                     .setNegativeButton("取消", null)
-                    .show();
+                    .create();
+
+            dialog.show();
         });
 
-        // 建立分帳對象勾選框
-        for (String name : members) {
-            CheckBox cb = new CheckBox(this);
-            cb.setText(name);
-            cb.setChecked(true);
-            memberSelectionContainer.addView(cb);
+        //類別 RecyclerView
+        RecyclerView rv = findViewById(R.id.items);
+        rv.setLayoutManager(new GridLayoutManager(this, 4));
+        List<Category> cats = Arrays.asList(
+                new Category(R.drawable.ic_group,      "蔡芯惠"),
+                new Category(R.drawable.ic_group,    "群組"),
+                new Category(R.drawable.ic_location, "位置"),
+                new Category(R.drawable.ic_setting,  "設定")
+        );
+        rv.setAdapter(new CategoryAdapter(this, cats));
+
+        //數字、運算符
+        int[] inputIds = {
+                R.id.number_1, R.id.number_2, R.id.number_3,
+                R.id.number_4, R.id.number_5, R.id.number_6,
+                R.id.number_7, R.id.number_8, R.id.number_9,
+                R.id.number_0, R.id.point,
+                R.id.plus, R.id.subtract, R.id.multiply, R.id.divide
+        };
+        for (int id : inputIds) {
+            findViewById(id).setOnClickListener(this::onDigitClick);
         }
 
-        findViewById(R.id.btnConfirm).setOnClickListener(v -> calculateSplit());
+        //AC、←
+        findViewById(R.id.clear).setOnClickListener(this::onClearClick);
+        findViewById(R.id.back).setOnClickListener(this::onBackClick);
+
+        //等號運算
+        findViewById(R.id.equal).setOnClickListener(this::onEqualClick);
     }
 
-    private void showImageOptions() {
-        new AlertDialog.Builder(this)
-                .setTitle("選擇圖片來源")
-                .setItems(new CharSequence[]{"拍照", "從相簿選取"}, (dialog, which) -> {
-                    if (which == 0) {
-                        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                            requestPermissions(new String[]{Manifest.permission.CAMERA}, 1001);
-                        } else {
-                            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                            takePhotoLauncher.launch(intent);
-                        }
-                    } else {
-                        Intent intent = new Intent(Intent.ACTION_PICK);
-                        intent.setType("image/*");
-                        pickImageLauncher.launch(intent);
+    public void onDigitClick(View v) {
+        if (amountBuilder.length() >= MAX_LEN) return;
+
+        String key = ((TextView) v).getText().toString();
+        char c = key.charAt(0);
+
+        if (isOperator(c)) {
+            if (amountBuilder.length() == 0) return;  // 開頭不允許運算符
+            char last = amountBuilder.charAt(amountBuilder.length() - 1);
+            if (isOperator(last)) {
+                //連續運算符
+                amountBuilder.setCharAt(amountBuilder.length() - 1, c);
+            } else {
+                amountBuilder.append(c);
+            }
+
+        } else if (c == '.') {
+            if (amountBuilder.length() == 0) {
+                amountBuilder.append("0.");
+            } else {
+                char last = amountBuilder.charAt(amountBuilder.length() - 1);
+                if (isOperator(last)) {
+                    amountBuilder.append("0.");
+                } else {
+                    //一個小數點
+                    int i = amountBuilder.length() - 1;
+                    while (i >= 0 && !isOperator(amountBuilder.charAt(i))) i--;
+                    String segment = amountBuilder.substring(i + 1);
+                    if (!segment.contains(".")) {
+                        amountBuilder.append('.');
                     }
-                })
-                .show();
-    }
+                }
+            }
 
-    private void calculateSplit() {
-        String note = etNote.getText().toString().trim();
-        String totalStr = etAmount.getText().toString().trim();
-
-        if (note.isEmpty() || totalStr.isEmpty()) {
-            Toast.makeText(this, "請輸入金額與備註", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        double totalAmount;
-        try {
-            totalAmount = Double.parseDouble(totalStr);
-        } catch (NumberFormatException e) {
-            Toast.makeText(this, "金額格式錯誤", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        List<String> selectedMembers = new ArrayList<>();
-        for (int i = 0; i < memberSelectionContainer.getChildCount(); i++) {
-            CheckBox cb = (CheckBox) memberSelectionContainer.getChildAt(i);
-            if (cb.isChecked()) selectedMembers.add(cb.getText().toString());
-        }
-
-        if (selectedMembers.isEmpty()) {
-            Toast.makeText(this, "請選擇至少一位分帳對象", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        Map<String, Double> actualPayments = new HashMap<>();
-        for (String name : chosenPayers) {
-            EditText input = payerInputs.get(name);
-            String value = input.getText().toString().trim();
-            double paid = value.isEmpty() ? 0 : Double.parseDouble(value);
-            actualPayments.put(name, paid);
-        }
-
-        double perPerson = totalAmount / selectedMembers.size();
-
-        String dateText = tvDate.getText().toString().trim();
-        if (dateText.equals("請選擇日期")) {
-            Toast.makeText(this, "請選擇消費日期", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        StringBuilder result = new StringBuilder("消費日期：" + dateText + "\n");
-        result.append("備註：「").append(note).append("」\n總金額 NT$").append(totalAmount).append("\n\n");
-
-        for (String name : selectedMembers) {
-            double paid = actualPayments.getOrDefault(name, 0.0);
-            double balance = paid - perPerson;
-            result.append(name)
-                    .append(" 已付 NT$").append(paid)
-                    .append(" → ")
-                    .append(balance >= 0 ? "收回" : "應付")
-                    .append(" NT$").append(String.format("%.2f", Math.abs(balance)))
-                    .append("\n");
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle("分帳結果")
-                .setMessage(result.toString())
-                .setPositiveButton("確認", (dialog, which) -> {
-                    Intent resultIntent = new Intent();
-                    resultIntent.putExtra("summary", result.toString());
-                    setResult(RESULT_OK, resultIntent);
-                    finish();
-                })
-                .show();
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        if (requestCode == 1001 && grantResults.length > 0 &&
-                grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-            takePhotoLauncher.launch(intent);
         } else {
-            Toast.makeText(this, "未取得相機權限", Toast.LENGTH_SHORT).show();
+            //開頭0
+            if (c == '0' && amountBuilder.length() == 0) return;
+            amountBuilder.append(c);
+        }
+
+        tvAmountDisplay.setText("NT$" + amountBuilder.toString());
+    }
+
+    public void onClearClick(View v) {
+        amountBuilder.setLength(0);
+        tvAmountDisplay.setText("NT$0");
+    }
+
+    public void onBackClick(View v) {
+        if (amountBuilder.length() > 0) {
+            amountBuilder.deleteCharAt(amountBuilder.length() - 1);
+            String s = amountBuilder.length() > 0
+                    ? amountBuilder.toString()
+                    : "0";
+            tvAmountDisplay.setText("NT$" + s);
         }
     }
 
-    private void updatePayerInputFields() {
-        payerAmountContainer.removeAllViews();
-        payerInputs.clear();
+    public void onEqualClick(View v) {
+        try {
+            //結尾符號刪掉
+            while (amountBuilder.length() > 0) {
+                char last = amountBuilder.charAt(amountBuilder.length() - 1);
+                if (isOperator(last) || last == '.') {
+                    amountBuilder.deleteCharAt(amountBuilder.length() - 1);
+                } else break;
+            }
+            String expr = amountBuilder.toString()
+                    .replace('×','*')
+                    .replace('÷','/');
+            double result = evaluate(expr);
+            String resStr = formatResult(result);
+            if (resStr.length() > MAX_LEN) {
+                resStr = resStr.substring(0, MAX_LEN);
+            }
+            tvAmountDisplay.setText("NT$" + resStr);
 
-        if (chosenPayers.isEmpty()) {
-            payerAmountContainer.setVisibility(View.GONE);
-            tvSelectPayers.setText("請選擇付款人");
-            return;
+            amountBuilder.setLength(0);
+            amountBuilder.append(resStr);
+
+        } catch (Exception e) {
+            tvAmountDisplay.setText("Error");
+            amountBuilder.setLength(0);
         }
+    }
 
-        payerAmountContainer.setVisibility(View.VISIBLE);
-        tvSelectPayers.setText("付款人：" + String.join(", ", chosenPayers));
-
-        for (String name : chosenPayers) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setPadding(0, 8, 0, 8);
-
-            TextView tv = new TextView(this);
-            tv.setText(name + "：");
-            tv.setTextSize(16);
-            tv.setWidth(120);
-
-            EditText input = new EditText(this);
-            input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-            input.setHint("付款金額");
-            input.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            payerInputs.put(name, input);
-
-            row.addView(tv);
-            row.addView(input);
-            payerAmountContainer.addView(row);
+    private boolean isOperator(char c) {
+        return c=='+'||c=='-'||c=='*'||c=='/'||c=='×'||c=='÷';
+    }
+    private double evaluate(String expr) {
+        Stack<Double> vals = new Stack<>();
+        Stack<Character> ops = new Stack<>();
+        int i=0;
+        while (i<expr.length()) {
+            char c = expr.charAt(i);
+            if (Character.isDigit(c) || c=='.') {
+                int j=i;
+                while (j<expr.length() &&
+                        (Character.isDigit(expr.charAt(j))||expr.charAt(j)=='.')) j++;
+                vals.push(Double.parseDouble(expr.substring(i,j)));
+                i=j;
+            } else {
+                while (!ops.isEmpty() && precedence(ops.peek())>=precedence(c)) {
+                    applyOp(vals, ops.pop());
+                }
+                ops.push(c);
+                i++;
+            }
         }
+        while (!ops.isEmpty()) applyOp(vals, ops.pop());
+        return vals.isEmpty()?0:vals.pop();
+    }
+
+    private int precedence(char op) {
+        switch(op){
+            case '+': case '-': return 1;
+            case '*': case '/': return 2;
+        }
+        return 0;
+    }
+
+    private void applyOp(Stack<Double> vals, char op) {
+        double b = vals.pop();
+        double a = vals.isEmpty()?0:vals.pop();
+        switch(op){
+            case '+': vals.push(a+b); break;
+            case '-': vals.push(a-b); break;
+            case '*': vals.push(a*b); break;
+            case '/': vals.push(b!=0?a/b:0); break;
+        }
+    }
+
+    private String formatResult(double v) {
+        return v==Math.floor(v)
+                ? String.valueOf((long)v)
+                : String.valueOf(v);
     }
 }
