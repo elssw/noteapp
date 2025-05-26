@@ -82,6 +82,28 @@
             android:textSize="16sp"
             android:layout_marginTop="4dp" />
 
+        <!-- 消費日期 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="消費日期"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:id="@+id/tvDate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="請選擇日期"
+            android:padding="12dp"
+            android:textSize="16sp"
+            android:background="@drawable/edittext_bg"
+            android:drawableEnd="@android:drawable/ic_menu_my_calendar"
+            android:layout_marginTop="4dp"
+            android:clickable="true"
+            android:focusable="true" />
+
         <!-- 付款人選擇 -->
         <TextView
             android:layout_width="match_parent"

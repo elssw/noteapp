@@ -2,6 +2,7 @@ package com.example.afinal;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -35,6 +36,8 @@ public class GroupCharge extends AppCompatActivity {
     private boolean[] selectedPayers;
     private List<String> chosenPayers = new ArrayList<>();
     private TextView tvSelectPayers;
+    private TextView tvDate;
+    private Calendar selectedDate = Calendar.getInstance();
 
 
     private final ActivityResultLauncher<Intent> pickImageLauncher =
@@ -72,6 +75,19 @@ public class GroupCharge extends AppCompatActivity {
 
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         imgPreview.setOnClickListener(v -> showImageOptions());
+
+        tvDate = findViewById(R.id.tvDate);
+
+        tvDate.setOnClickListener(v -> {
+            int year = selectedDate.get(Calendar.YEAR);
+            int month = selectedDate.get(Calendar.MONTH);
+            int day = selectedDate.get(Calendar.DAY_OF_MONTH);
+
+            new DatePickerDialog(GroupCharge.this, (view, y, m, d) -> {
+                selectedDate.set(y, m, d);
+                tvDate.setText(String.format(Locale.getDefault(), "%04d-%02d-%02d", y, m + 1, d));
+            }, year, month, day).show();
+        });
 
         // 初始隱藏付款欄位
         payerAmountContainer.setVisibility(View.GONE);
@@ -169,7 +185,15 @@ public class GroupCharge extends AppCompatActivity {
 
         double perPerson = totalAmount / selectedMembers.size();
 
-        StringBuilder result = new StringBuilder("備註：「" + note + "」\n總金額 NT$" + totalAmount + "\n\n");
+        String dateText = tvDate.getText().toString().trim();
+        if (dateText.equals("請選擇日期")) {
+            Toast.makeText(this, "請選擇消費日期", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        StringBuilder result = new StringBuilder("消費日期：" + dateText + "\n");
+        result.append("備註：「").append(note).append("」\n總金額 NT$").append(totalAmount).append("\n\n");
+
         for (String name : selectedMembers) {
             double paid = actualPayments.getOrDefault(name, 0.0);
             double balance = paid - perPerson;
