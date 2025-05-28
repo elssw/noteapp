@@ -192,7 +192,7 @@ public class GroupFragment extends Fragment {
 
                 // ✅ 改成跳到分帳情況 Activity
                 Intent intent = new Intent(context, GroupDetail.class);
-                intent.putExtra("group_name", groupName); // 若你要傳值可加上
+                intent.putExtra("groupName", groupName); // 若你要傳值可加上
                 startActivity(intent);
             }
         });
