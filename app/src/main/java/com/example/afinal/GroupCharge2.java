@@ -32,7 +32,7 @@ public class GroupCharge2 extends AppCompatActivity {
     private FlexboxLayout memberSelectionContainer;
 
     // 預設所有群組成員名稱
-    private List<String> members = Arrays.asList("我", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z");
+    private List<String> members = Arrays.asList("我", "A", "B", "C", "D", "E");
 
     // 用於記錄付款人與其對應的金額輸入框
     private Map<String, EditText> payerInputs = new HashMap<>();
@@ -232,8 +232,12 @@ public class GroupCharge2 extends AppCompatActivity {
                 .setTitle("分帳結果")
                 .setMessage(result.toString())
                 .setPositiveButton("確認", (dialog, which) -> {
+                    // 建立單行紀錄文字，例如：2025-05-28 - 我 NT$200
+                    String record = String.format("%s - %s NT$%.0f", dateText,
+                            chosenPayers.isEmpty() ? "未知付款人" : chosenPayers.get(0), totalAmount);
                     Intent resultIntent = new Intent();
                     resultIntent.putExtra("summary", result.toString());
+                    resultIntent.putExtra("record", record);
                     setResult(RESULT_OK, resultIntent);
                     finish();
                 })
