@@ -23,6 +23,7 @@ import android.Manifest;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -46,10 +47,14 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.FirebaseApp;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
@@ -67,7 +72,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private Button uploadButton;
     private Button editButton;
     private RestaurantAdapter adapter;
-//    private SharedPreferences prefs;
+    //    private SharedPreferences prefs;
     private List<Uri> imageUris = new ArrayList<>();
     private FirebaseFirestore db;
     private  int number = 1;
@@ -85,6 +90,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN);
         mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         ImageButton imb= findViewById(R.id.btn_location);
@@ -127,7 +133,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 System.out.println("滑動進度: " + slideOffset);
             }
         });
-       // imagePreview = findViewById(R.id.image_preview);
+        // imagePreview = findViewById(R.id.image_preview);
         uploadButton = findViewById(R.id.upload_button);
         editButton=findViewById(R.id.edit_button);
         Comment=findViewById(R.id.textView);
@@ -136,7 +142,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         adapter = new RestaurantAdapter(this,imageUris);
         recyclerView.setAdapter(adapter);
 
-        SharedPreferences prefs = getSharedPreferences("MyPrefs", MODE_PRIVATE);
+//        SharedPreferences prefs = getSharedPreferences("MyPrefs", MODE_PRIVATE);
         uploadButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -169,7 +175,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 String name = poi.name;
                 placeId = poi.placeId;
                 LatLng latLng = poi.latLng;
-
+                uploadButton.setVisibility(View.VISIBLE);
+                editButton.setVisibility(View.VISIBLE);
                 // 你可以印出來或顯示在 Bottom Sheet、Dialog 中
                 TextView placeName = findViewById(R.id.place_name);
                 TextView placeAddress = findViewById(R.id.place_address);
@@ -180,11 +187,32 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
                 mMap.getUiSettings().setMyLocationButtonEnabled(false);
 
+                SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
+                String userid = prefs.getString("userid", "0");
                 // 例如放一個標記
                 mMap.clear();
                 mMap.addMarker(new MarkerOptions()
                         .position(latLng)
                         .title(name));
+                imageUris.clear();
+                adapter.notifyDataSetChanged();  // 通知 RecyclerView 整體更新
+                Comment.setText("");
+                DocumentReference placeRef = db.collection("users").document(userid)
+                        .collection("map").document(placeId);
+
+                placeRef.get().addOnSuccessListener(snapshot -> {
+                    if (snapshot.exists()) {
+                        Comment.setText((String) snapshot.get("comment"));
+                        List<String> imageUrls = (List<String>) snapshot.get("images");  // 讀取 images 陣列
+                        if (imageUrls != null) {
+                            for (String url : imageUrls) {
+                                imageUris.add(Uri.parse(url));  // 轉成 Uri 並加入
+                            }
+
+                            // ✅ 通知 RecyclerView 更新
+                            adapter.notifyItemInserted(imageUris.size() - 1);
+                        }
+                    }});
             }
         });
         // **設定地圖樣式**
@@ -221,62 +249,92 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         String comments = Comment.getText().toString().trim();
         SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
         String userid = prefs.getString("userid", "0");
-        place place = new place(comments, "place_id", "uri_string", 0);
+
         if(userid.equals(0)){
 
 
         }
         else{
-            db.collection("users")
-                    .document(userid)
-                    .collection("favorites")
-                    .add(place)
-                    .addOnSuccessListener(documentReference -> {
-                        Log.d("Firestore", "儲存成功：" + documentReference.getId());
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e("Firestore", "儲存失敗：" + e.getMessage());
-                    });
+            DocumentReference placeRef = db.collection("users").document(userid)
+                    .collection("map").document(placeId);
 
-
+            placeRef.get().addOnSuccessListener(snapshot -> {
+                if (snapshot.exists()) {
+                    placeRef.update("comment", comments);
+                } else {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("place_id", placeId);
+                    data.put("comment", comments);
+                    db.collection("users").document(userid).collection("map").document(placeId).set(data);
+                }
+            });
         }
 
 
     }
+
     private void openImagePicker() {
-        Intent intent = new Intent(Intent.ACTION_PICK);
+//        Intent intent = new Intent(Intent.ACTION_PICK);
+//        intent.setType("image/*");
+//        startActivityForResult(intent, REQUEST_IMAGE_PICK);
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.setType("image/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); // ✅ 加上這行
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityForResult(intent, REQUEST_IMAGE_PICK);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode,  Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
+        String userid = prefs.getString("userid", "0");
 
         if (requestCode == REQUEST_IMAGE_PICK && resultCode == RESULT_OK && data != null) {
             Uri imageUri = data.getData();
+            //final int takeFlags = data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            final int takeFlags = (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            getContentResolver().takePersistableUriPermission(imageUri, takeFlags);
+
             if (imageUri != null) {
-//                try {
+                if(userid.equals(0)){
+
+
+                }
+                else{
+
+                    DocumentReference placeRef = db.collection("users").document(userid)
+                            .collection("map").document(placeId);
+
+                    placeRef.get().addOnSuccessListener(snapshot -> {
+                        if (snapshot.exists()) {
+                            placeRef.update("images", FieldValue.arrayUnion(imageUri.toString()));
+                        } else {
+                            Map<String, Object> value = new HashMap<>();
+                            value.put("place_id", placeId);
+                            value.put("images", Collections.singletonList(imageUri.toString()));
+                            db.collection("users").document(userid).collection("map").document(placeId).set(value);
+                        }
+                    });
+//                    placeRef.get().addOnSuccessListener(snapshot -> {
+//                        if (snapshot.exists()) {
+//                            List<String> imageUrls = (List<String>) snapshot.get("images");  // 讀取 images 陣列
+//                            if (imageUrls != null) {
+//
+//                                for (String url : imageUrls) {
+//                                    imageUris.add(Uri.parse(url));  // 轉成 Uri 並加入
+//                                }
+//                                adapter.notifyDataSetChanged();
+                    // ✅ 通知 RecyclerView 更新
                     imageUris.add(imageUri);
-//                    SharedPreferences.Editor editor = prefs.edit();
-                    //editor.putString(, imageUri.toString());
+                    adapter.notifyItemInserted(imageUris.size() - 1);
+//                            }
+//                        }});
 
-//                    editor.putInt("age", 21);
-//                    editor.putBoolean("dark_mode", true);
-//                    editor.apply(); // 或 editor.commit();
-                    adapter.notifyItemInserted(imageUris.size() - 1);  // 通知 RecyclerView 更新畫面
 
-//                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-//                        ImageDecoder.Source source = ImageDecoder.createSource(getContentResolver(), imageUri);
-//                        bitmap = ImageDecoder.decodeBitmap(source);
-//                    } else {
-//                        bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
-//                    }
-//                    imagePreview.setImageBitmap(bitmap);
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                    Toast.makeText(this, "圖片載入失敗", Toast.LENGTH_SHORT).show();
-//                }
+
+                }
+
             }
         }
     }
