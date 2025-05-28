@@ -25,38 +25,51 @@ import java.util.*;
 
 public class GroupCharge2 extends AppCompatActivity {
 
+    // 宣告 UI 元件與資料結構
     private ImageView imgPreview;
     private EditText etAmount, etNote;
     private LinearLayout payerAmountContainer;
     private FlexboxLayout memberSelectionContainer;
+
+    // 預設所有群組成員名稱
     private List<String> members = Arrays.asList("我", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z");
+
+    // 用於記錄付款人與其對應的金額輸入框
     private Map<String, EditText> payerInputs = new HashMap<>();
+
+    // 圖片 Uri（可選擇或拍照）
     private Uri selectedImageUri = null;
+
+    // 用於記錄選擇的付款人
     private boolean[] selectedPayers;
     private List<String> chosenPayers = new ArrayList<>();
+
     private TextView tvSelectPayers;
     private TextView tvDate;
+
+    // 紀錄使用者選擇的日期
     private Calendar selectedDate = Calendar.getInstance();
 
-
+    // 相簿選取圖片
     private final ActivityResultLauncher<Intent> pickImageLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == RESULT_OK && result.getData() != null) {
                     selectedImageUri = result.getData().getData();
                     try {
                         Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), selectedImageUri);
-                        imgPreview.setImageBitmap(bitmap);
+                        imgPreview.setImageBitmap(bitmap); // 預覽圖片
                     } catch (IOException e) {
                         Toast.makeText(this, "圖片讀取失敗", Toast.LENGTH_SHORT).show();
                     }
                 }
             });
 
+    // 拍照取得圖片
     private final ActivityResultLauncher<Intent> takePhotoLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
                 if (result.getResultCode() == RESULT_OK && result.getData() != null) {
                     Bitmap photo = (Bitmap) result.getData().getExtras().get("data");
-                    imgPreview.setImageBitmap(photo);
+                    imgPreview.setImageBitmap(photo); // 預覽相片
                     selectedImageUri = null;
                 }
             });
@@ -66,17 +79,23 @@ public class GroupCharge2 extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_group_charge2);
 
+        // 初始化 UI 元件
         imgPreview = findViewById(R.id.imgPreview);
         etAmount = findViewById(R.id.etAmount);
         etNote = findViewById(R.id.etNote);
         payerAmountContainer = findViewById(R.id.payerAmountContainer);
         memberSelectionContainer = findViewById(R.id.memberSelectionContainer);
+        tvDate = findViewById(R.id.tvDate);
+        tvSelectPayers = findViewById(R.id.tvSelectPayers);
+        selectedPayers = new boolean[members.size()];
 
+        // 返回上一頁
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+
+        // 點擊圖片可選擇或拍照
         imgPreview.setOnClickListener(v -> showImageOptions());
 
-        tvDate = findViewById(R.id.tvDate);
-
+        // 點擊選擇消費日期
         tvDate.setOnClickListener(v -> {
             int year = selectedDate.get(Calendar.YEAR);
             int month = selectedDate.get(Calendar.MONTH);
@@ -88,15 +107,10 @@ public class GroupCharge2 extends AppCompatActivity {
             }, year, month, day).show();
         });
 
-        // 初始隱藏付款欄位
+        // 初始不顯示付款金額欄位
         payerAmountContainer.setVisibility(View.GONE);
 
-        // Spinner 初始化
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, members);
-
-        tvSelectPayers = findViewById(R.id.tvSelectPayers);
-        selectedPayers = new boolean[members.size()];
-
+        // 點擊選擇付款人，彈出多選 Dialog
         tvSelectPayers.setOnClickListener(v -> {
             String[] names = members.toArray(new String[0]);
             new AlertDialog.Builder(this)
@@ -109,28 +123,31 @@ public class GroupCharge2 extends AppCompatActivity {
                         }
                     })
                     .setPositiveButton("確定", (dialog, which) -> {
-                        updatePayerInputFields();
+                        updatePayerInputFields(); // 根據選擇更新輸入欄位
                     })
                     .setNegativeButton("取消", null)
                     .show();
         });
 
-        // 建立分帳對象勾選框
+        // 為每個成員建立勾選框（是否要參與分帳）
         for (String name : members) {
             CheckBox cb = new CheckBox(this);
             cb.setText(name);
-            cb.setChecked(true);
+            cb.setChecked(true); // 預設全選
             memberSelectionContainer.addView(cb);
         }
 
+        // 點擊確認計算分帳
         findViewById(R.id.btnConfirm).setOnClickListener(v -> calculateSplit());
     }
 
+    // 顯示選擇圖片來源的對話框
     private void showImageOptions() {
         new AlertDialog.Builder(this)
                 .setTitle("選擇圖片來源")
                 .setItems(new CharSequence[]{"拍照", "從相簿選取"}, (dialog, which) -> {
                     if (which == 0) {
+                        // 拍照需要相機權限
                         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                             requestPermissions(new String[]{Manifest.permission.CAMERA}, 1001);
                         } else {
@@ -146,6 +163,7 @@ public class GroupCharge2 extends AppCompatActivity {
                 .show();
     }
 
+    // 計算每人應付金額，並顯示分帳結果
     private void calculateSplit() {
         String note = etNote.getText().toString().trim();
         String totalStr = etAmount.getText().toString().trim();
@@ -163,6 +181,7 @@ public class GroupCharge2 extends AppCompatActivity {
             return;
         }
 
+        // 蒐集有被勾選的成員（參與分帳）
         List<String> selectedMembers = new ArrayList<>();
         for (int i = 0; i < memberSelectionContainer.getChildCount(); i++) {
             CheckBox cb = (CheckBox) memberSelectionContainer.getChildAt(i);
@@ -174,6 +193,7 @@ public class GroupCharge2 extends AppCompatActivity {
             return;
         }
 
+        // 建立每位付款人的實際付款金額資料
         Map<String, Double> actualPayments = new HashMap<>();
         for (String name : chosenPayers) {
             EditText input = payerInputs.get(name);
@@ -182,14 +202,17 @@ public class GroupCharge2 extends AppCompatActivity {
             actualPayments.put(name, paid);
         }
 
+        // 計算每人應付金額（平均分攤）
         double perPerson = totalAmount / selectedMembers.size();
 
+        // 檢查是否已選擇日期
         String dateText = tvDate.getText().toString().trim();
         if (dateText.equals("請選擇日期")) {
             Toast.makeText(this, "請選擇消費日期", Toast.LENGTH_SHORT).show();
             return;
         }
 
+        // 組合結果文字
         StringBuilder result = new StringBuilder("消費日期：" + dateText + "\n");
         result.append("備註：「").append(note).append("」\n總金額 NT$").append(totalAmount).append("\n\n");
 
@@ -204,6 +227,7 @@ public class GroupCharge2 extends AppCompatActivity {
                     .append("\n");
         }
 
+        // 顯示分帳結果對話框，並回傳至前一頁（或結束）
         new AlertDialog.Builder(this)
                 .setTitle("分帳結果")
                 .setMessage(result.toString())
@@ -216,6 +240,7 @@ public class GroupCharge2 extends AppCompatActivity {
                 .show();
     }
 
+    // 拍照權限結果處理
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
@@ -228,6 +253,7 @@ public class GroupCharge2 extends AppCompatActivity {
         }
     }
 
+    // 更新付款金額欄位（根據選擇的付款人）
     private void updatePayerInputFields() {
         payerAmountContainer.removeAllViews();
         payerInputs.clear();
