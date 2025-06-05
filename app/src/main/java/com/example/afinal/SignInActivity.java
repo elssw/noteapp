@@ -61,7 +61,7 @@ public class SignInActivity extends AppCompatActivity {
                                 if (task.isSuccessful()) {
                                     FirebaseUser user = mAuth.getCurrentUser();
                                     Toast.makeText(SignInActivity.this, "登入成功：" + user.getEmail(), Toast.LENGTH_SHORT).show();
-                                    String uid = user.getUid();
+                                    String uid = user.getEmail();
                                     editor.putString("userid", uid);
                                     editor.apply();
                                     // 跳轉至主畫面

@@ -11,6 +11,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -29,6 +30,10 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class SignUpActivity extends AppCompatActivity {
 
@@ -66,10 +71,28 @@ public class SignUpActivity extends AppCompatActivity {
                                 if (task.isSuccessful()) {
                                     FirebaseUser user = mAuth.getCurrentUser();
                                     String uid = user.getUid();
-                                    editor.putString("userid", uid);
+//                                    editor.putString("userid", uid);
+//                                    editor.apply();
+
+                                    String email = user.getEmail();
+                                    editor.putString("userid", email);
                                     editor.apply();
-                                    Toast.makeText(SignUpActivity.this, "註冊成功：" + user.getEmail(), Toast.LENGTH_SHORT).show();
-                                    startActivity(new Intent(SignUpActivity.this, MainActivity2.class));
+                                    // ✅ 建立 Firestore 資料
+                                    FirebaseFirestore db = FirebaseFirestore.getInstance();
+                                    Map<String, Object> userData = new HashMap<>();
+//                                    userData.put("uid" , uid);
+                                    db.collection("users").document(email)
+                                            .set(userData)
+                                            .addOnSuccessListener(aVoid -> {
+                                                Toast.makeText(SignUpActivity.this, "註冊成功：" + email, Toast.LENGTH_SHORT).show();
+                                                startActivity(new Intent(SignUpActivity.this, MainActivity2.class));
+                                            })
+                                            .addOnFailureListener(e -> {
+                                                Log.e("FirestoreError", "Firestore 儲存失敗：" + e.getMessage());
+
+                                            });
+                                    //Toast.makeText(SignUpActivity.this, "註冊成功：" + user.getEmail(), Toast.LENGTH_SHORT).show();
+                                    //startActivity(new Intent(SignUpActivity.this, MainActivity2.class));
                                 } else {
                                     Toast.makeText(SignUpActivity.this, "註冊失敗：" + task.getException().getMessage(), Toast.LENGTH_LONG).show();
                                 }
