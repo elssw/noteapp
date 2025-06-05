@@ -58,7 +58,7 @@ public class BubbleView extends View {
 
         for (int i = 0; i < bubbles.size(); i++) {
             Bubble b = bubbles.get(i);
-            float radius = Math.min(150f, Math.abs(b.amount) * 2f);  // 金額轉大小
+            float radius = Math.max(50f, Math.min(150f, Math.abs(b.amount) * 2f));
             float cx = spacing * (i + 1);
             float cy = centerY;
 

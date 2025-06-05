@@ -2,6 +2,7 @@ package com.example.afinal;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
 import android.widget.ListView;
@@ -23,11 +24,7 @@ public class GroupDetail extends AppCompatActivity {
     private List<String> displayItems = new ArrayList<>();
     private ArrayAdapter<String> adapter;
 
-    // 成員收支資料
     private Map<String, Float> balances = new LinkedHashMap<>();
-    private Set<String> allMembers = new LinkedHashSet<>(Arrays.asList("我", "小a", "陳啟瑋", "A", "B", "C", "D", "E"));
-
-    // 歷史紀錄
     private List<String[]> records = new ArrayList<>();
 
     @Override
@@ -42,19 +39,9 @@ public class GroupDetail extends AppCompatActivity {
         btnBack = findViewById(R.id.btnBack);
 
         String groupName = getIntent().getStringExtra("groupName");
-        if (groupName != null) {
-            group_name.setText(groupName);
-        }
+        if (groupName != null) group_name.setText(groupName);
 
         btnBack.setOnClickListener(v -> finish());
-
-        // 初始化模擬資料
-        records.add(new String[]{"2025-05-26", "小a 買飲料 $40"});
-        records.add(new String[]{"2025-05-20", "陳啟瑋 買便當 $65"});
-        records.add(new String[]{"2025-04-18", "小a 買車票 $120"});
-
-        balances.put("小a", -65f);
-        balances.put("陳啟瑋", 65f);
 
         updateDisplayItems();
 
@@ -81,9 +68,12 @@ public class GroupDetail extends AppCompatActivity {
                     String content = parts[1];
 
                     String[] summaryLines = summary.split("\n");
-                    String payerName = null;
                     float total = 0;
+                    Set<String> involved = new HashSet<>();
+                    List<String> splitMembers = new ArrayList<>();
+                    Map<String, Float> payments = new HashMap<>();
 
+                    // 解析摘要資訊
                     for (String line : summaryLines) {
                         if (line.startsWith("總金額")) {
                             String[] temp = line.split("NT\\$");
@@ -91,45 +81,71 @@ public class GroupDetail extends AppCompatActivity {
                                 total = Float.parseFloat(temp[1].trim());
                             }
                         }
-                        if (line.contains("已付 NT$")) {
+
+                        if (line.contains("已付 NT$") && line.contains("→")) {
                             String[] tokens = line.split(" ");
-                            payerName = tokens[0];  // e.g. A 已付 NT$72
+                            String name = tokens[0];
+                            String paidStr = tokens[2].replace("NT$", "");
+                            try {
+                                float paid = Float.parseFloat(paidStr);
+                                payments.put(name, paid);
+                                involved.add(name);
+
+                                if (line.contains("→ 應付")) {
+                                    splitMembers.add(name); // 明確應付者
+                                } else if (line.contains("→ 收回")) {
+                                    int index = line.indexOf("→ 收回 NT$");
+                                    if (index != -1) {
+                                        String receiveStr = line.substring(index + "→ 收回 NT$".length()).trim();
+                                        try {
+                                            float receive = Float.parseFloat(receiveStr);
+                                            if (receive < paid) {
+                                                splitMembers.add(name); // 有分帳但有實際付款 → 需扣平均
+                                            }
+                                        } catch (NumberFormatException e) {
+                                            Log.e("parse-error", "收回金額轉換失敗：" + receiveStr);
+                                        }
+                                    }
+                                }
+
+                            } catch (NumberFormatException e) {
+                                Log.e("parse-error", "金額轉換失敗：" + paidStr);
+                            }
                         }
                     }
 
-                    if (payerName != null && total > 0) {
-                        List<String> splitMembers = new ArrayList<>();
-                        for (String line : summaryLines) {
-                            if (line.contains("應付 NT$")) {
-                                splitMembers.add(line.split(" ")[0]);
-                            }
-                        }
-
-                        float perPerson = total / splitMembers.size();
-
-                        // 更新收支
-                        balances.put(payerName, balances.getOrDefault(payerName, 0f) + total);
-                        updateBubbleView();
-                        for (String member : splitMembers) {
-                            balances.put(member, balances.getOrDefault(member, 0f) - perPerson);
-                        }
-
-                        // 新增紀錄，避免重複
-                        boolean duplicate = false;
-                        for (String[] record : records) {
-                            if (record[0].equals(date) && record[1].equals(content)) {
-                                duplicate = true;
-                                break;
-                            }
-                        }
-                        if (!duplicate) {
-                            records.add(new String[]{date, content});
-                        }
-
-                        updateDisplayItems();
-                        adapter.notifyDataSetChanged();
-                        listView.post(() -> listView.setSelection(displayItems.size() - 1));
+                    // 將參與分帳者平均扣除金額
+                    float perPerson = total / splitMembers.size();
+                    for (String member : splitMembers) {
+                        balances.put(member, balances.getOrDefault(member, 0f) - perPerson);
                     }
+
+                    // 將付款金額加入 balances
+                    for (Map.Entry<String, Float> entry : payments.entrySet()) {
+                        String name = entry.getKey();
+                        float paid = entry.getValue();
+                        balances.put(name, balances.getOrDefault(name, 0f) + paid);
+                    }
+
+                    // 確保所有參與者在 balances 裡都有值
+                    for (String name : involved) {
+                        balances.putIfAbsent(name, balances.getOrDefault(name, 0f));
+                    }
+
+                    // 避免新增重複紀錄
+                    boolean duplicate = false;
+                    for (String[] record : records) {
+                        if (record[0].equals(date) && record[1].equals(content)) {
+                            duplicate = true;
+                            break;
+                        }
+                    }
+                    if (!duplicate) records.add(new String[]{date, content});
+
+                    // 更新 UI 顯示
+                    updateDisplayItems();
+                    adapter.notifyDataSetChanged();
+                    listView.post(() -> listView.setSelection(displayItems.size() - 1));
                 }
             }
         }
@@ -139,10 +155,8 @@ public class GroupDetail extends AppCompatActivity {
         displayItems.clear();
         updateBubbleView();
 
-        // 第一區：計算誰應付誰
         displayItems.add(generateSummaryText());
 
-        // 第二區 + 第三區：紀錄資料依月份分類
         Collections.sort(records, (a, b) -> b[0].compareTo(a[0]));
         Map<String, List<String>> monthMap = new LinkedHashMap<>();
 
@@ -163,7 +177,9 @@ public class GroupDetail extends AppCompatActivity {
         List<String> names = new ArrayList<>(balances.keySet());
         List<Float> amounts = new ArrayList<>();
         for (String name : names) {
-            amounts.add(balances.get(name));
+            Float value = balances.getOrDefault(name, 0f);
+            Log.d("bubble-log", name + " → " + value);
+            amounts.add(value);
         }
         bubbleView.setData(names, amounts);
     }
@@ -172,20 +188,36 @@ public class GroupDetail extends AppCompatActivity {
         Map<String, Float> tempBalances = new LinkedHashMap<>(balances);
         StringBuilder summary = new StringBuilder();
 
-        for (Map.Entry<String, Float> payer : tempBalances.entrySet()) {
-            if (payer.getValue() < 0) {
-                for (Map.Entry<String, Float> receiver : tempBalances.entrySet()) {
-                    if (receiver.getValue() > 0) {
-                        float transfer = Math.min(-payer.getValue(), receiver.getValue());
-                        if (transfer > 0.01f) {
-                            summary.append(payer.getKey()).append(" 應付 $")
-                                    .append(String.format("%.0f", transfer))
-                                    .append(" 給 ").append(receiver.getKey()).append("\n");
-                            tempBalances.put(payer.getKey(), payer.getValue() + transfer);
-                            tempBalances.put(receiver.getKey(), receiver.getValue() - transfer);
-                        }
-                    }
-                }
+        // 收集應付與應收成員
+        List<Map.Entry<String, Float>> debtors = new ArrayList<>();
+        List<Map.Entry<String, Float>> creditors = new ArrayList<>();
+        for (Map.Entry<String, Float> entry : tempBalances.entrySet()) {
+            float value = entry.getValue();
+            if (value < -0.01f) debtors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), value));
+            else if (value > 0.01f) creditors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), value));
+        }
+
+        // 清算流程：每個應付者優先還錢給最大應收者
+        for (Map.Entry<String, Float> debtor : debtors) {
+            String debtorName = debtor.getKey();
+            float amountToPay = -debtor.getValue(); // 轉為正值
+
+            for (Map.Entry<String, Float> creditor : creditors) {
+                if (amountToPay <= 0) break;
+
+                String creditorName = creditor.getKey();
+                float creditorAmount = creditor.getValue();
+
+                if (creditorAmount <= 0) continue;
+
+                float transfer = Math.min(amountToPay, creditorAmount);
+
+                summary.append(debtorName).append(" 應付 $")
+                        .append(String.format("%.0f", transfer))
+                        .append(" 給 ").append(creditorName).append("\n");
+
+                amountToPay -= transfer;
+                creditor.setValue(creditorAmount - transfer);
             }
         }
 

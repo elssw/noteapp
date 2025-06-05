@@ -216,9 +216,14 @@ public class GroupCharge2 extends AppCompatActivity {
         StringBuilder result = new StringBuilder("消費日期：" + dateText + "\n");
         result.append("備註：「").append(note).append("」\n總金額 NT$").append(totalAmount).append("\n\n");
 
-        for (String name : selectedMembers) {
+        // 將 allInvolved 改為付款人與分帳人總合
+        Set<String> allInvolved = new LinkedHashSet<>();
+        allInvolved.addAll(selectedMembers);
+        allInvolved.addAll(actualPayments.keySet());
+
+        for (String name : allInvolved) {
             double paid = actualPayments.getOrDefault(name, 0.0);
-            double balance = paid - perPerson;
+            double balance = selectedMembers.contains(name) ? (paid - perPerson) : paid;
             result.append(name)
                     .append(" 已付 NT$").append(paid)
                     .append(" → ")
