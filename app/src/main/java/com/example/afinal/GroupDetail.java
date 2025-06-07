@@ -38,6 +38,9 @@ public class GroupDetail extends AppCompatActivity {
     // 每筆紀錄，格式為 [日期, 顯示內容]，用來顯示在畫面上
     private List<String[]> records = new ArrayList<>();
 
+    // email 轉暱稱
+    private Map<String, String> emailToNickname = new HashMap<>();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -64,6 +67,47 @@ public class GroupDetail extends AppCompatActivity {
 
         startRealtimeListener();
 
+        db.collection("users")
+                .document(userId)
+                .collection("group")
+                .document(groupName)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    List<String> memberEmails = (List<String>) documentSnapshot.get("members");
+                    if (memberEmails != null && !memberEmails.isEmpty()) {
+                        int total = memberEmails.size();
+                        int[] loadedCount = {0};
+
+                        for (String email : memberEmails) {
+                            db.collection("users")
+                                    .document(email)
+                                    .get()
+                                    .addOnSuccessListener(userDoc -> {
+                                        String nickname = userDoc.getString("nickname");
+                                        if (nickname != null) {
+                                            emailToNickname.put(email, nickname);
+                                        }
+
+                                        loadedCount[0]++;
+                                        if (loadedCount[0] == total) {
+                                            updateDisplayItems(); // 所有 nickname 都載入完成再更新畫面
+                                            adapter.notifyDataSetChanged();
+                                        }
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        loadedCount[0]++;
+                                        if (loadedCount[0] == total) {
+                                            updateDisplayItems(); // 即使有失敗，也在全部完成後刷新
+                                            adapter.notifyDataSetChanged();
+                                        }
+                                    });
+                        }
+                    } else {
+                        updateDisplayItems(); // 沒有成員也要更新畫面
+                        adapter.notifyDataSetChanged();
+                    }
+                });
+
         // 初始化畫面：更新 ListView 顯示內容 (讀取 FireBase 時註解)
         updateDisplayItems();
 
@@ -75,18 +119,44 @@ public class GroupDetail extends AppCompatActivity {
         listView.setOnItemClickListener((parent, view, position, id) -> {
             String item = displayItems.get(position);
 
-            // 只針對分帳紀錄（格式為 yyyy-MM-dd - 記錄內容）處理刪除
+            // 排除非分帳紀錄的項目
+            if (item.startsWith("📅") || item.startsWith("目前無需清算") || item.startsWith("A 應付") || item.trim().isEmpty()) {
+                return; // 不處理月份標題、摘要
+            }
+
             if (item.contains(" - ")) {
-                new android.app.AlertDialog.Builder(this)
-                        .setTitle("刪除紀錄")
-                        .setMessage("是否要刪除此分帳紀錄？\n" + item)
-                        .setPositiveButton("刪除", (dialog, which) -> {
-                            deleteRecord(item);
-                        })
-                        .setNegativeButton("取消", null)
-                        .show();
+                String[] parts = item.split(" - ", 2);
+                if (parts.length == 2) {
+                    String date = parts[0];
+                    String content = parts[1];
+
+                    // 從 Firebase 查出該筆 recordId
+                    db.collection("users")
+                            .document(userId)
+                            .collection("group")
+                            .document(groupName)
+                            .collection("records")
+                            .whereEqualTo("date", date)
+                            .whereEqualTo("content", content)
+                            .get()
+                            .addOnSuccessListener(querySnapshot -> {
+                                for (QueryDocumentSnapshot doc : querySnapshot) {
+                                    String recordId = doc.getId();
+
+                                    Intent intent = new Intent(GroupDetail.this, GroupChargeEdit.class);
+                                    intent.putExtra("groupName", groupName);
+                                    intent.putExtra("recordId", recordId);
+                                    intent.putExtra("date", date);
+                                    intent.putExtra("content", content);
+                                    intent.putExtra("summary", doc.getString("summary"));
+                                    startActivityForResult(intent, 101);
+                                    break;
+                                }
+                            });
+                }
             }
         });
+
 
         // 點擊「新增記帳」按鈕，開啟記帳畫面
         fabAdd.setOnClickListener(v -> {
@@ -228,6 +298,43 @@ public class GroupDetail extends AppCompatActivity {
                 }
             }
         }
+
+        // 從 GroupChargeEdit 回來自動刷新
+        if (requestCode == 101 && resultCode == RESULT_OK) {
+            // 直接重新從 Firebase 載入 records 和 balances
+            db.collection("users")
+                    .document(userId)
+                    .collection("group")
+                    .document(groupName)
+                    .collection("records")
+                    .get()
+                    .addOnSuccessListener(querySnapshot -> {
+                        records.clear();
+                        balances.clear();
+
+                        for (QueryDocumentSnapshot doc : querySnapshot) {
+                            String date = doc.getString("date");
+                            String content = doc.getString("content");
+                            if (date == null || content == null) continue;
+                            records.add(new String[]{date, content});
+
+                            Map<String, Object> bal = (Map<String, Object>) doc.get("balances");
+                            if (bal != null) {
+                                for (Map.Entry<String, Object> entry : bal.entrySet()) {
+                                    String name = entry.getKey();
+                                    Object val = entry.getValue();
+                                    if (val instanceof Number) {
+                                        float amount = ((Number) val).floatValue();
+                                        balances.put(name, balances.getOrDefault(name, 0f) + amount);
+                                    }
+                                }
+                            }
+                        }
+
+                        updateDisplayItems();
+                        adapter.notifyDataSetChanged();
+                    });
+        }
     }
 
     // 根據 balances 和紀錄更新畫面顯示
@@ -258,15 +365,30 @@ public class GroupDetail extends AppCompatActivity {
 
     // 更新泡泡圖資料：名稱與餘額
     private void updateBubbleView() {
-        List<String> names = new ArrayList<>(balances.keySet());
+        List<String> names = new ArrayList<>();
         List<Float> amounts = new ArrayList<>();
-        for (String name : names) {
-            Float value = balances.getOrDefault(name, 0f);
-            Log.d("bubble-log", name + " → " + value); // debug 用
-            amounts.add(value);
+
+        for (Map.Entry<String, Float> entry : balances.entrySet()) {
+            String email = entry.getKey();
+            Float amount = entry.getValue();
+
+            // 轉換為暱稱（若找不到就顯示 email）
+            String nickname;
+            if (email.equals(userId)) {
+                nickname = emailToNickname.getOrDefault(email, "我"); // 或 myNickname
+            } else {
+                nickname = emailToNickname.getOrDefault(email, email);
+            }
+
+            Log.d("bubble-log", nickname + " → " + amount); // debug 用
+            names.add(nickname);
+            amounts.add(amount);
         }
+
         bubbleView.setData(names, amounts); // 傳入自定義 view 更新泡泡
     }
+
+
 
     // 產生目前應收應付的文字說明，如「A 應付 $100 給 B」
     private String generateSummaryText() {
@@ -284,13 +406,13 @@ public class GroupDetail extends AppCompatActivity {
 
         // 使用 greedy 方法依序還債（不最佳但足夠明確）
         for (Map.Entry<String, Float> debtor : debtors) {
-            String debtorName = debtor.getKey();
+            String debtorName = emailToNickname.getOrDefault(debtor.getKey(), debtor.getKey());
             float amountToPay = -debtor.getValue();
 
             for (Map.Entry<String, Float> creditor : creditors) {
                 if (amountToPay <= 0) break;
 
-                String creditorName = creditor.getKey();
+                String creditorName = emailToNickname.getOrDefault(creditor.getKey(), creditor.getKey());
                 float creditorAmount = creditor.getValue();
 
                 if (creditorAmount <= 0) continue;
@@ -384,5 +506,6 @@ public class GroupDetail extends AppCompatActivity {
                     updateDisplayItems();
                     adapter.notifyDataSetChanged();
                 });
+        updateBubbleView();
     }
 }

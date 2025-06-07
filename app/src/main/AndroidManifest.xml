@@ -21,6 +21,9 @@
         android:theme="@style/Theme.Final"
         tools:targetApi="31">
         <activity
+            android:name=".GroupChargeEdit"
+            android:exported="false" />
+        <activity
             android:name=".GroupCharge"
             android:exported="false" />
         <activity
@@ -38,7 +41,6 @@
         <activity
             android:name=".Charge"
             android:exported="false" />
-
 
         <provider
             android:name="androidx.core.content.FileProvider"
