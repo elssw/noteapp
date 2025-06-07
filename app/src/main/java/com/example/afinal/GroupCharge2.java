@@ -4,11 +4,13 @@ import android.Manifest;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.view.View;
 import android.widget.*;
 
@@ -19,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.flexbox.FlexboxLayout;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.io.IOException;
 import java.util.*;
@@ -32,7 +35,7 @@ public class GroupCharge2 extends AppCompatActivity {
     private FlexboxLayout memberSelectionContainer; // 勾選每位成員是否參與分帳的區塊
 
     // 群組成員清單（實際使用時應改為從後端/Intent 取得）
-    private List<String> members = Arrays.asList("我", "A", "B", "C", "D", "E");
+    private List<String> members = new ArrayList<>();
 
     // 記錄付款人對應的輸入框（姓名 => 金額輸入欄）
     private Map<String, EditText> payerInputs = new HashMap<>();
@@ -89,7 +92,6 @@ public class GroupCharge2 extends AppCompatActivity {
         memberSelectionContainer = findViewById(R.id.memberSelectionContainer);
         tvDate = findViewById(R.id.tvDate);
         tvSelectPayers = findViewById(R.id.tvSelectPayers);
-        selectedPayers = new boolean[members.size()];
 
         // 返回鍵
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
@@ -109,11 +111,43 @@ public class GroupCharge2 extends AppCompatActivity {
             }, year, month, day).show();
         });
 
+        // 從 FireBase 抓取群組人員資料
+        Intent intent = getIntent();
+        String groupName = intent.getStringExtra("groupName");
+
+        SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
+        String userId = prefs.getString("userid", "0");
+
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        db.collection("users")
+                .document(userId)
+                .collection("group")
+                .document(groupName)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        List<String> membersList = (List<String>) documentSnapshot.get("members");
+                        if (membersList != null && !membersList.isEmpty()) {
+                            members.clear();
+                            members.addAll(membersList);
+                            setupMembers();
+                        } else {
+                            Toast.makeText(this, "群組成員為空", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> Log.e("Firestore", "載入群組成員失敗：" + e.getMessage()));
+
+
         // 預設不顯示付款金額區塊，除非有選付款人
         payerAmountContainer.setVisibility(View.GONE);
 
         // 點選「選擇付款人」 → 顯示多選清單
         tvSelectPayers.setOnClickListener(v -> {
+            if (members.isEmpty()) {
+                Toast.makeText(this, "尚未載入群組成員", Toast.LENGTH_SHORT).show();
+                return;
+            }
             String[] names = members.toArray(new String[0]);
             new AlertDialog.Builder(this)
                     .setTitle("選擇付款人")
@@ -128,14 +162,6 @@ public class GroupCharge2 extends AppCompatActivity {
                     .setNegativeButton("取消", null)
                     .show();
         });
-
-        // 初始化每位成員的勾選框（是否參與分帳）
-        for (String name : members) {
-            CheckBox cb = new CheckBox(this);
-            cb.setText(name);
-            cb.setChecked(true); // 預設全部參與
-            memberSelectionContainer.addView(cb);
-        }
 
         // 點擊確認後計算分帳邏輯
         findViewById(R.id.btnConfirm).setOnClickListener(v -> calculateSplit());
@@ -291,6 +317,21 @@ public class GroupCharge2 extends AppCompatActivity {
             row.addView(tv);
             row.addView(input);
             payerAmountContainer.addView(row);
+        }
+    }
+
+    // 動態載入人員
+    private void setupMembers() {
+        memberSelectionContainer.removeAllViews();
+        payerInputs.clear();
+        selectedPayers = new boolean[members.size()];
+        chosenPayers.clear();
+
+        for (String name : members) {
+            CheckBox cb = new CheckBox(this);
+            cb.setText(name);
+            cb.setChecked(true);
+            memberSelectionContainer.addView(cb);
         }
     }
 }

@@ -25,7 +25,8 @@ public class GroupDetail extends AppCompatActivity {
     private TextView group_name; // 群組名稱顯示欄位
     private ImageButton btnBack; // 返回上一頁的按鈕
     private String groupName; // 從上一頁傳來的群組名稱
-
+    private String userId; // 成員
+    private FirebaseFirestore db; // 資料庫
 
     // 顯示用資料
     private List<String> displayItems = new ArrayList<>(); // ListView 要顯示的所有項目（含結算摘要與記錄）
@@ -57,54 +58,11 @@ public class GroupDetail extends AppCompatActivity {
         btnBack.setOnClickListener(v -> finish());
 
         // 從 Firestore 載入歷史紀錄
-        /*FirebaseFirestore db = FirebaseFirestore.getInstance();
+        db = FirebaseFirestore.getInstance();
         SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
-        String userId = prefs.getString("userid", "0");
+        userId = prefs.getString("userid", "0"); // 儲存為類別成員變數
 
-        if (userId != null && !userId.equals("0") && groupName != null) {
-            db.collection("users")
-                    .document(userId)
-                    .collection("group")
-                    .document(groupName)
-                    .collection("records")
-                    .get()
-                    .addOnSuccessListener(querySnapshot -> {
-                        for (QueryDocumentSnapshot doc : querySnapshot) {
-                            String date = doc.getString("date");
-                            String content = doc.getString("content");
-
-                            if (date == null || content == null) continue;
-
-                            // 避免重複加入
-                            boolean exists = false;
-                            for (String[] r : records) {
-                                if (r[0].equals(date) && r[1].equals(content)) {
-                                    exists = true;
-                                    break;
-                                }
-                            }
-                            if (!exists) records.add(new String[]{date, content});
-
-                            // 合併 balances（選擇性，也可以保留最新狀態）
-                            Map<String, Object> bal = (Map<String, Object>) doc.get("balances");
-                            if (bal != null) {
-                                for (Map.Entry<String, Object> entry : bal.entrySet()) {
-                                    String name = entry.getKey();
-                                    Object val = entry.getValue();
-                                    if (val instanceof Number) {
-                                        float amount = ((Number) val).floatValue();
-                                        balances.put(name, balances.getOrDefault(name, 0f) + amount);
-                                    }
-                                }
-                            }
-                        }
-
-                        // 資料載入完後更新畫面
-                        updateDisplayItems();
-                        adapter.notifyDataSetChanged();
-                    })
-                    .addOnFailureListener(e -> Log.e("Firestore", "讀取紀錄失敗：" + e.getMessage()));
-        }*/
+        startRealtimeListener();
 
         // 初始化畫面：更新 ListView 顯示內容 (讀取 FireBase 時註解)
         updateDisplayItems();
@@ -113,10 +71,28 @@ public class GroupDetail extends AppCompatActivity {
         adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, displayItems);
         listView.setAdapter(adapter);
 
+        // 刪除單筆分帳紀錄
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            String item = displayItems.get(position);
+
+            // 只針對分帳紀錄（格式為 yyyy-MM-dd - 記錄內容）處理刪除
+            if (item.contains(" - ")) {
+                new android.app.AlertDialog.Builder(this)
+                        .setTitle("刪除紀錄")
+                        .setMessage("是否要刪除此分帳紀錄？\n" + item)
+                        .setPositiveButton("刪除", (dialog, which) -> {
+                            deleteRecord(item);
+                        })
+                        .setNegativeButton("取消", null)
+                        .show();
+            }
+        });
+
         // 點擊「新增記帳」按鈕，開啟記帳畫面
         fabAdd.setOnClickListener(v -> {
             Intent intent = new Intent(GroupDetail.this, GroupCharge2.class);
-            startActivityForResult(intent, 100); // 請求碼 100：期待回傳記帳結果
+            intent.putExtra("groupName", groupName);
+            startActivityForResult(intent, 100);
         });
     }
 
@@ -226,7 +202,7 @@ public class GroupDetail extends AppCompatActivity {
                     listView.post(() -> listView.setSelection(displayItems.size() - 1));
 
                     // 存入 FireBase
-                    /*FirebaseFirestore db = FirebaseFirestore.getInstance();
+                    FirebaseFirestore db = FirebaseFirestore.getInstance();
                     SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
                     String userId = prefs.getString("userid", "0");
 
@@ -248,7 +224,7 @@ public class GroupDetail extends AppCompatActivity {
                                 .set(recordData)
                                 .addOnSuccessListener(aVoid -> Log.d("Firestore", "分帳記錄儲存成功"))
                                 .addOnFailureListener(e -> Log.e("Firestore", "儲存失敗：" + e.getMessage()));
-                    }*/
+                    }
                 }
             }
         }
@@ -331,5 +307,82 @@ public class GroupDetail extends AppCompatActivity {
         }
 
         return summary.length() > 0 ? summary.toString().trim() : "目前無需清算";
+    }
+
+    // 刪除單筆分帳紀錄
+    private void deleteRecord(String target) {
+        String[] parts = target.split(" - ");
+        if (parts.length < 2) return;
+
+        String date = parts[0];
+        String content = parts[1];
+
+        // 刪除 Firestore 中對應紀錄
+        db.collection("users")
+                .document(userId)
+                .collection("group")
+                .document(groupName)
+                .collection("records")
+                .whereEqualTo("date", date)
+                .whereEqualTo("content", content)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    for (QueryDocumentSnapshot doc : querySnapshot) {
+                        doc.getReference().delete();
+                    }
+                })
+                .addOnFailureListener(e -> Log.e("Firestore", "刪除失敗：" + e.getMessage()));
+
+        // 預先從畫面暫時移除這筆紀錄，避免使用者感覺沒刪成功
+        Iterator<String[]> iterator = records.iterator();
+        while (iterator.hasNext()) {
+            String[] record = iterator.next();
+            if (record[0].equals(date) && record[1].equals(content)) {
+                iterator.remove();
+                break;
+            }
+        }
+        updateDisplayItems();
+        adapter.notifyDataSetChanged();
+    }
+
+    // 即時監聽
+    private void startRealtimeListener() {
+        db.collection("users")
+                .document(userId)
+                .collection("group")
+                .document(groupName)
+                .collection("records")
+                .addSnapshotListener((querySnapshot, e) -> {
+                    if (e != null || querySnapshot == null) {
+                        Log.w("Firestore", "即時監聽失敗", e);
+                        return;
+                    }
+
+                    records.clear();
+                    balances.clear();
+
+                    for (QueryDocumentSnapshot doc : querySnapshot) {
+                        String date = doc.getString("date");
+                        String content = doc.getString("content");
+                        if (date == null || content == null) continue;
+                        records.add(new String[]{date, content});
+
+                        Map<String, Object> bal = (Map<String, Object>) doc.get("balances");
+                        if (bal != null) {
+                            for (Map.Entry<String, Object> entry : bal.entrySet()) {
+                                String name = entry.getKey();
+                                Object val = entry.getValue();
+                                if (val instanceof Number) {
+                                    float amount = ((Number) val).floatValue();
+                                    balances.put(name, balances.getOrDefault(name, 0f) + amount);
+                                }
+                            }
+                        }
+                    }
+
+                    updateDisplayItems();
+                    adapter.notifyDataSetChanged();
+                });
     }
 }
