@@ -327,6 +327,27 @@ public class GroupCharge2 extends AppCompatActivity {
                 .setPositiveButton("確認", (dialog, which) -> {
                     String record = String.format("%s - NT$%.0f %s", dateText, totalAmount, note); // eg. 2025-06-04 - 900 晚餐
                     Intent resultIntent = new Intent();
+
+                    // 將 balance 結果組成 Map<String, Float>
+                    Map<String, Float> balancesToSend = new HashMap<>();
+
+                    for (String email : allInvolved) {
+                        double paid = actualPayments.getOrDefault(email, 0.0);
+                        boolean isParticipant = selectedMembers.contains(email);
+                        double balance;
+                        if (isParticipant) {
+                            balance = paid - perPerson;
+                        } else if (paid > 0) {
+                            balance = paid;
+                        } else {
+                            continue;
+                        }
+                        balancesToSend.put(email, (float) balance);
+                    }
+
+                    // 轉成 JSON 傳出
+                    resultIntent.putExtra("balances", new com.google.gson.Gson().toJson(balancesToSend));
+
                     resultIntent.putExtra("summary", result.toString());
                     resultIntent.putExtra("record", record);
                     setResult(RESULT_OK, resultIntent);
@@ -407,7 +428,7 @@ public class GroupCharge2 extends AppCompatActivity {
 
             String displayName = m.getEmail().equals(myEmail) ? myNickname : m.getNickname();
 
-            nicknameToEmail.put(displayName, m.getEmail());  // ⬅️ 用顯示名稱當 key 才對！
+            nicknameToEmail.put(displayName, m.getEmail());  // 用顯示名稱當 key 才對！
             emailToNickname.put(m.getEmail(), displayName);  // 也一併更新為統一使用 displayName
 
             CheckBox cb = new CheckBox(this);

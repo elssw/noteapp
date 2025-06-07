@@ -35,6 +35,7 @@ import com.example.afinal.Fragment.Setting.SettingReminderFragment;
 import com.example.afinal.R;
 import com.example.afinal.SignInActivity;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.yalantis.ucrop.UCrop;
 
 import java.io.File;
@@ -127,6 +128,16 @@ public class SettingFragment extends Fragment {
                         if (!newName.isEmpty()) {
                             tvNickname.setText(newName);
                             prefs.edit().putString(KEY_NICKNAME, newName).apply();
+                            SharedPreferences loginPrefs = requireContext().getSharedPreferences("login", 0);
+                            String userId = loginPrefs.getString("userid", "");
+
+                            FirebaseFirestore.getInstance()
+                                    .collection("users")
+                                    .document(userId)
+                                    .update("nickname", newName)
+                                    .addOnSuccessListener(aVoid -> Log.d("Setting", "暱稱已同步到 Firestore"))
+                                    .addOnFailureListener(e -> Log.e("Setting", "更新暱稱失敗：" + e.getMessage()));
+
                         }
                     })
                     .setNegativeButton("取消", null)

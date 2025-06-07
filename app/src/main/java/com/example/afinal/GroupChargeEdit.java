@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat;
 import com.example.afinal.model.Member;
 import com.google.android.flexbox.FlexboxLayout;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.io.IOException;
 import java.util.*;
@@ -37,6 +38,10 @@ public class GroupChargeEdit extends AppCompatActivity {
 
     // 群組成員清單（實際使用時應改為從後端/Intent 取得）
     private List<Member> members = new ArrayList<>();
+    private ArrayList<String> originalPayers;
+    private ArrayList<Double> payerAmounts;
+    private ArrayList<String> originalParticipants;
+    private String groupId;
 
     // 記錄付款人對應的輸入框（姓名 => 金額輸入欄）
     private Map<String, EditText> payerInputs = new HashMap<>();
@@ -102,15 +107,23 @@ public class GroupChargeEdit extends AppCompatActivity {
         tvDate = findViewById(R.id.tvDate);
         tvSelectPayers = findViewById(R.id.tvSelectPayers);
 
-        // 接收原本的紀錄資料並填入 UI
         Intent intent = getIntent();
+        groupId = intent.getStringExtra("groupId");
+
+        if (groupId == null || groupId.isEmpty()) {
+            Toast.makeText(this, "無法取得群組 ID，請重新進入", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        // 接收原本的紀錄資料並填入 UI
         String recordId = intent.getStringExtra("recordId");
         String originalNote = intent.getStringExtra("note");
         double originalAmount = intent.getDoubleExtra("amount", 0);
         String originalDate = intent.getStringExtra("date");
-        ArrayList<String> originalPayers = intent.getStringArrayListExtra("payers");
-        ArrayList<Double> payerAmounts = (ArrayList<Double>) intent.getSerializableExtra("payerAmounts");
-        ArrayList<String> originalParticipants = intent.getStringArrayListExtra("participants");
+        originalPayers = intent.getStringArrayListExtra("payers");
+        payerAmounts = (ArrayList<Double>) intent.getSerializableExtra("payerAmounts");
+        originalParticipants = intent.getStringArrayListExtra("participants");
 
         // 先設定基本欄位
         etNote.setText(originalNote);
@@ -142,9 +155,6 @@ public class GroupChargeEdit extends AppCompatActivity {
         // 判斷是否是當前使用者，用 email 比對，改為暱稱
         SharedPreferences loginPrefs = getSharedPreferences("login", MODE_PRIVATE);
         myEmail = loginPrefs.getString("userid", ""); // 這是目前登入者的 email
-
-        // Firebase 成功載入完後會呼叫：
-        setupMembers();
 
         // 從 FireBase 抓取群組人員資料
         intent = getIntent();
@@ -453,25 +463,70 @@ public class GroupChargeEdit extends AppCompatActivity {
     }
 
     // 動態載入人員
+    // 動態載入人員
     private void setupMembers() {
-        memberSelectionContainer.removeAllViews();
-        payerInputs.clear();
-        selectedPayers = new boolean[members.size()];
-        chosenPayers.clear();
-        nicknameToEmail.clear();
-        emailToNickname.clear();
+        SharedPreferences pref = getSharedPreferences("prefs", MODE_PRIVATE);
+        myEmail = pref.getString("email", "");
+        myNickname = pref.getString("nickname", "");
 
-        for (int i = 0; i < members.size(); i++) {
-            Member m = members.get(i);
-            nicknameToEmail.put(m.getNickname(), m.getEmail());
-            emailToNickname.put(m.getEmail(), m.getNickname());
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
 
-            String displayName = m.getEmail().equals(myEmail) ? myNickname : m.getNickname();
+        db.collection("groups").document(groupId)
+                .collection("members")
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    members.clear();
+                    nicknameToEmail.clear();
+                    emailToNickname.clear();
 
-            CheckBox cb = new CheckBox(this);
-            cb.setText(displayName);
-            cb.setChecked(true);
-            memberSelectionContainer.addView(cb);
-        }
+                    // 初始化 selectedPayers 這邊才安全
+                    selectedPayers = new boolean[queryDocumentSnapshots.size()];
+
+                    Map<String, Double> originalPaymentMap = new HashMap<>();
+                    if (originalPayers != null && payerAmounts != null) {
+                        for (int i = 0; i < originalPayers.size(); i++) {
+                            originalPaymentMap.put(originalPayers.get(i), payerAmounts.get(i));
+                        }
+                    }
+
+                    int i = 0;
+                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                        String email = doc.getString("email");
+                        String nickname = doc.getString("nickname");
+                        Member m = new Member(email, nickname);
+                        members.add(m);
+                        nicknameToEmail.put(nickname, email);
+                        emailToNickname.put(email, nickname);
+
+                        // 建立 checkbox
+                        String displayName = email.equals(myEmail) ? myNickname : nickname;
+                        CheckBox cb = new CheckBox(this);
+                        cb.setText(displayName);
+                        cb.setChecked(originalParticipants != null && originalParticipants.contains(email));
+                        memberSelectionContainer.addView(cb);
+
+                        // 加入已選付款人
+                        if (originalPayers.contains(email)) {
+                            chosenPayers.add(m);
+                            selectedPayers[i] = true;
+                        }
+
+                        i++;
+                    }
+
+                    updatePayerInputFields();
+
+                    for (Map.Entry<String, EditText> entry : payerInputs.entrySet()) {
+                        String nickname = entry.getKey();
+                        EditText input = entry.getValue();
+
+                        String email = nicknameToEmail.get(nickname);
+                        if (email != null) {
+                            Double amt = originalPaymentMap.get(email);
+                            if (amt != null) input.setText(String.valueOf(amt));
+                        }
+                    }
+
+                });
     }
 }

@@ -84,26 +84,32 @@ public class GroupDetail extends AppCompatActivity {
                                     .get()
                                     .addOnSuccessListener(userDoc -> {
                                         String nickname = userDoc.getString("nickname");
-                                        if (nickname != null) {
+
+                                        // ✅ 加入 fallback 處理
+                                        if (nickname != null && !nickname.trim().isEmpty()) {
                                             emailToNickname.put(email, nickname);
+                                        } else {
+                                            emailToNickname.put(email, email); // fallback 顯示 email
                                         }
 
                                         loadedCount[0]++;
                                         if (loadedCount[0] == total) {
-                                            updateDisplayItems(); // 所有 nickname 都載入完成再更新畫面
+                                            updateDisplayItems();
                                             adapter.notifyDataSetChanged();
                                         }
                                     })
                                     .addOnFailureListener(e -> {
+                                        // ❗失敗也 fallback，避免 map 沒有 key
+                                        emailToNickname.put(email, email);
                                         loadedCount[0]++;
                                         if (loadedCount[0] == total) {
-                                            updateDisplayItems(); // 即使有失敗，也在全部完成後刷新
+                                            updateDisplayItems();
                                             adapter.notifyDataSetChanged();
                                         }
                                     });
                         }
                     } else {
-                        updateDisplayItems(); // 沒有成員也要更新畫面
+                        updateDisplayItems();
                         adapter.notifyDataSetChanged();
                     }
                 });
@@ -144,6 +150,7 @@ public class GroupDetail extends AppCompatActivity {
                                     String recordId = doc.getId();
 
                                     Intent intent = new Intent(GroupDetail.this, GroupChargeEdit.class);
+                                    intent.putExtra("groupId", groupName); // ← 加上這行
                                     intent.putExtra("groupName", groupName);
                                     intent.putExtra("recordId", recordId);
                                     intent.putExtra("date", date);
@@ -170,138 +177,49 @@ public class GroupDetail extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
+        // 處理 GroupCharge2 回傳資料
         if (requestCode == 100 && resultCode == RESULT_OK && data != null) {
-
-            // 取得傳回來的記錄資訊
             String newRecord = data.getStringExtra("record");  // 格式如：2025-06-05 - A NT$450
-            String summary = data.getStringExtra("summary");   // 詳細結算內容，每行格式如 A 已付 NT$300 → 應付 NT$200
+            String summary = data.getStringExtra("summary");
+            String balancesJson = data.getStringExtra("balances");
 
-            if (newRecord != null && !newRecord.isEmpty()) {
+            if (newRecord != null && !newRecord.isEmpty() && balancesJson != null) {
+                // 解析日期與內容
                 String[] parts = newRecord.split(" - ");
                 if (parts.length >= 2) {
                     String date = parts[0];
                     String content = parts[1];
 
-                    String[] summaryLines = summary.split("\n");
-                    float total = 0;
-                    Set<String> involved = new HashSet<>();        // 所有出現在此次記帳的人
-                    List<String> splitMembers = new ArrayList<>(); // 參與分攤的人
-                    Map<String, Float> payments = new HashMap<>(); // 實際付款紀錄
+                    // ✅ 轉換 balancesJson 成 Map<String, Float>
+                    Map<String, Float> returnedBalances = new com.google.gson.Gson().fromJson(
+                            balancesJson,
+                            new com.google.gson.reflect.TypeToken<Map<String, Float>>() {}.getType()
+                    );
 
-                    // 解析每行結算資訊
-                    for (String line : summaryLines) {
-                        // 解析總金額
-                        if (line.startsWith("總金額")) {
-                            String[] temp = line.split("NT\\$");
-                            if (temp.length == 2) {
-                                total = Float.parseFloat(temp[1].trim());
-                            }
-                        }
+                    // ✅ 儲存 Firestore：不在這裡加總 balances，由即時監聽處理
+                    String recordId = UUID.randomUUID().toString();
+                    Map<String, Object> recordData = new HashMap<>();
+                    recordData.put("date", date);
+                    recordData.put("content", content);
+                    recordData.put("summary", summary);
+                    recordData.put("balances", returnedBalances);
 
-                        // 解析付款與收支情形
-                        if (line.contains("已付 NT$") && line.contains("→")) {
-                            String[] tokens = line.split(" ");
-                            String name = tokens[0];
-                            String paidStr = tokens[2].replace("NT$", "");
-                            try {
-                                float paid = Float.parseFloat(paidStr);
-                                payments.put(name, paid);
-                                involved.add(name);
-
-                                // 若是應付，表示此人有分攤
-                                if (line.contains("→ 應付")) {
-                                    splitMembers.add(name);
-                                }
-                                // 若是收回金額但比付款少，表示也有分攤
-                                else if (line.contains("→ 收回")) {
-                                    int index = line.indexOf("→ 收回 NT$");
-                                    if (index != -1) {
-                                        String receiveStr = line.substring(index + "→ 收回 NT$".length()).trim();
-                                        try {
-                                            float receive = Float.parseFloat(receiveStr);
-                                            if (receive < paid) {
-                                                splitMembers.add(name);
-                                            }
-                                        } catch (NumberFormatException e) {
-                                            Log.e("parse-error", "收回金額轉換失敗：" + receiveStr);
-                                        }
-                                    }
-                                }
-
-                            } catch (NumberFormatException e) {
-                                Log.e("parse-error", "金額轉換失敗：" + paidStr);
-                            }
-                        }
-                    }
-
-                    // 平均分攤金額計算（每人應付金額）
-                    float perPerson = total / splitMembers.size();
-
-                    // 每位分帳者：扣掉應付金額
-                    for (String member : splitMembers) {
-                        balances.put(member, balances.getOrDefault(member, 0f) - perPerson);
-                    }
-
-                    // 每位付款者：加上實際支付金額
-                    for (Map.Entry<String, Float> entry : payments.entrySet()) {
-                        String name = entry.getKey();
-                        float paid = entry.getValue();
-                        balances.put(name, balances.getOrDefault(name, 0f) + paid);
-                    }
-
-                    // 確保所有參與者都至少有一筆 entry
-                    for (String name : involved) {
-                        balances.putIfAbsent(name, balances.getOrDefault(name, 0f));
-                    }
-
-                    // 確認是否重複紀錄
-                    boolean duplicate = false;
-                    for (String[] record : records) {
-                        if (record[0].equals(date) && record[1].equals(content)) {
-                            duplicate = true;
-                            break;
-                        }
-                    }
-
-                    // 若為新紀錄則新增
-                    if (!duplicate) records.add(new String[]{date, content});
-
-                    // 更新畫面
-                    updateDisplayItems();
-                    adapter.notifyDataSetChanged();
-                    listView.post(() -> listView.setSelection(displayItems.size() - 1));
-
-                    // 存入 FireBase
-                    FirebaseFirestore db = FirebaseFirestore.getInstance();
-                    SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
-                    String userId = prefs.getString("userid", "0");
-
-                    if (!userId.equals("0")) {
-                        String recordId = UUID.randomUUID().toString(); // 自動產生一個唯一 ID
-
-                        Map<String, Object> recordData = new HashMap<>();
-                        recordData.put("date", date);
-                        recordData.put("content", content);
-                        recordData.put("summary", summary);
-                        recordData.put("balances", balances); // 若你希望儲存目前的餘額狀態
-
-                        db.collection("users")
-                                .document(userId)
-                                .collection("group")
-                                .document(groupName)
-                                .collection("records")
-                                .document(recordId)
-                                .set(recordData)
-                                .addOnSuccessListener(aVoid -> Log.d("Firestore", "分帳記錄儲存成功"))
-                                .addOnFailureListener(e -> Log.e("Firestore", "儲存失敗：" + e.getMessage()));
-                    }
+                    db.collection("users")
+                            .document(userId)
+                            .collection("group")
+                            .document(groupName)
+                            .collection("records")
+                            .document(recordId)
+                            .set(recordData)
+                            .addOnSuccessListener(aVoid -> Log.d("Firestore", "分帳記錄儲存成功"))
+                            .addOnFailureListener(e -> Log.e("Firestore", "儲存失敗：" + e.getMessage()));
                 }
             }
         }
 
-        // 從 GroupChargeEdit 回來自動刷新
+        // 處理從 GroupChargeEdit 返回的更新
         if (requestCode == 101 && resultCode == RESULT_OK) {
-            // 直接重新從 Firebase 載入 records 和 balances
             db.collection("users")
                     .document(userId)
                     .collection("group")
@@ -337,6 +255,7 @@ public class GroupDetail extends AppCompatActivity {
         }
     }
 
+
     // 根據 balances 和紀錄更新畫面顯示
     private void updateDisplayItems() {
         displayItems.clear();
@@ -352,6 +271,12 @@ public class GroupDetail extends AppCompatActivity {
         for (String[] record : records) {
             String date = record[0];
             String content = record[1];
+
+            // 替換 email 為 nickname（只在畫面顯示用）
+            for (Map.Entry<String, String> entry : emailToNickname.entrySet()) {
+                content = content.replace(entry.getKey(), entry.getValue());
+            }
+
             String month = date.substring(0, 7); // 取 yyyy-MM 作為 key
             monthMap.computeIfAbsent(month, k -> new ArrayList<>()).add(date + " - " + content);
         }
@@ -373,12 +298,7 @@ public class GroupDetail extends AppCompatActivity {
             Float amount = entry.getValue();
 
             // 轉換為暱稱（若找不到就顯示 email）
-            String nickname;
-            if (email.equals(userId)) {
-                nickname = emailToNickname.getOrDefault(email, "我"); // 或 myNickname
-            } else {
-                nickname = emailToNickname.getOrDefault(email, email);
-            }
+            String nickname = emailToNickname.getOrDefault(email, email);
 
             Log.d("bubble-log", nickname + " → " + amount); // debug 用
             names.add(nickname);
@@ -388,30 +308,30 @@ public class GroupDetail extends AppCompatActivity {
         bubbleView.setData(names, amounts); // 傳入自定義 view 更新泡泡
     }
 
-
-
     // 產生目前應收應付的文字說明，如「A 應付 $100 給 B」
     private String generateSummaryText() {
+        // 建立新的 map，不會影響原本的 balances
         Map<String, Float> tempBalances = new LinkedHashMap<>(balances);
         StringBuilder summary = new StringBuilder();
 
-        List<Map.Entry<String, Float>> debtors = new ArrayList<>();    // 欠錢的人（負數）
-        List<Map.Entry<String, Float>> creditors = new ArrayList<>();  // 應收的人（正數）
+        List<Map.Entry<String, Float>> debtors = new ArrayList<>();
+        List<Map.Entry<String, Float>> creditors = new ArrayList<>();
 
         for (Map.Entry<String, Float> entry : tempBalances.entrySet()) {
             float value = entry.getValue();
-            if (value < -0.01f) debtors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), value));
-            else if (value > 0.01f) creditors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), value));
+            if (value < -0.01f) {
+                debtors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), value));
+            } else if (value > 0.01f) {
+                creditors.add(new AbstractMap.SimpleEntry<>(entry.getKey(), value));
+            }
         }
 
-        // 使用 greedy 方法依序還債（不最佳但足夠明確）
         for (Map.Entry<String, Float> debtor : debtors) {
             String debtorName = emailToNickname.getOrDefault(debtor.getKey(), debtor.getKey());
             float amountToPay = -debtor.getValue();
 
-            for (Map.Entry<String, Float> creditor : creditors) {
-                if (amountToPay <= 0) break;
-
+            for (int i = 0; i < creditors.size(); i++) {
+                Map.Entry<String, Float> creditor = creditors.get(i);
                 String creditorName = emailToNickname.getOrDefault(creditor.getKey(), creditor.getKey());
                 float creditorAmount = creditor.getValue();
 
@@ -424,12 +344,14 @@ public class GroupDetail extends AppCompatActivity {
                         .append(" 給 ").append(creditorName).append("\n");
 
                 amountToPay -= transfer;
-                creditor.setValue(creditorAmount - transfer);
+                creditors.set(i, new AbstractMap.SimpleEntry<>(creditor.getKey(), creditorAmount - transfer));
+                if (amountToPay <= 0) break;
             }
         }
 
         return summary.length() > 0 ? summary.toString().trim() : "目前無需清算";
     }
+
 
     // 刪除單筆分帳紀錄
     private void deleteRecord(String target) {
