@@ -43,7 +43,7 @@
                 android:id="@+id/tvTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="新增分帳"
+                android:text="分帳紀錄編輯"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
