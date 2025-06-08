@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
 
@@ -23,6 +25,22 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Final"
         tools:targetApi="31">
+
+        <activity android:name=".JoinGroupActivity"
+            android:exported="true" >
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- 修改為你真正的網域 -->
+                <data android:scheme="https"
+                    android:host="fcunoteapp.page.link"
+                    android:pathPrefix="/joinGroup" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".GroupChargeEdit"
             android:exported="false" />
