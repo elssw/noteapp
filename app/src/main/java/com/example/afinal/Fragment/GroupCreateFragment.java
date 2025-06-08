@@ -182,7 +182,7 @@ public class GroupCreateFragment extends Fragment {
                         if (doc.exists()) {
                             etGroupName.setError("群組名稱已存在");
                         } else {
-                            // 🔽 圖片處理
+                            // 圖片處理
                             Bitmap bitmap;
                             if (imgGroupPhoto.getDrawable() instanceof BitmapDrawable) {
                                 bitmap = ((BitmapDrawable) imgGroupPhoto.getDrawable()).getBitmap();
@@ -193,7 +193,7 @@ public class GroupCreateFragment extends Fragment {
                             bitmap.compress(Bitmap.CompressFormat.JPEG, 10, stream);
                             String imageBase64 = Base64.encodeToString(stream.toByteArray(), Base64.DEFAULT);
 
-                            // 🔽 建立群組資料
+                            // 建立群組資料
                             Map<String, Object> groupData = new HashMap<>();
                             groupData.put("group_name", groupName);
                             /*
@@ -221,7 +221,7 @@ public class GroupCreateFragment extends Fragment {
                                         .get()
                                         .addOnSuccessListener(documentSnapshot -> {
                                             if (documentSnapshot.exists()) {
-                                                // ✅ 該 invitedUid 存在才新增群組資料
+                                                // 該 invitedUid 存在才新增群組資料
                                                 db.collection("users")
                                                         .document(invitedUid)
                                                         .collection("group")
@@ -343,7 +343,7 @@ public class GroupCreateFragment extends Fragment {
                 return;
             }
 
-            // ✅ 查詢 Firestore 確認該帳號是否存在
+            // 查詢 Firestore 確認該帳號是否存在
             FirebaseFirestore db = FirebaseFirestore.getInstance();
             db.collection("users")
                     .document(invitee)  // 注意這裡是直接用帳號當 document ID
@@ -430,26 +430,24 @@ public class GroupCreateFragment extends Fragment {
                 reader.close();
 
                 if (responseCode == HttpURLConnection.HTTP_OK) {
-                    Log.d("EmailJS", "✅ 邀請信成功寄出！\n回應內容：" + response.toString());
+                    Log.d("EmailJS", "邀請信成功寄出！\n回應內容：" + response.toString());
                 } else {
-                    Log.e("EmailJS", "❌ 邀請信寄送失敗，代碼：" + responseCode + "\n錯誤回應：" + response.toString());
+                    Log.e("EmailJS", "邀請信寄送失敗，代碼：" + responseCode + "\n錯誤回應：" + response.toString());
                 }
 
             } catch (Exception e) {
-                Log.e("EmailJS", "🔥 發送過程發生錯誤：" + e.getMessage(), e);
+                Log.e("EmailJS", "發送過程發生錯誤：" + e.getMessage(), e);
             }
         }).start();
 
     }
 
 
-
-
     // 放在 Fragment 類別中
     private void checkCompletion(int completed, int total, List<String> successList, List<String> failList, Context context) {
         if (completed == total) {
-            Log.d("InviteResult", "✅ 成功邀請：" + successList);
-            Log.d("InviteResult", "❌ 失敗邀請：" + failList);
+            Log.d("InviteResult", "成功邀請：" + successList);
+            Log.d("InviteResult", "失敗邀請：" + failList);
             Toast.makeText(context, "成功：" + successList + "\n失敗：" + failList, Toast.LENGTH_LONG).show();
         }
     }
@@ -478,8 +476,8 @@ public class GroupCreateFragment extends Fragment {
 //                    .addOnSuccessListener(querySnapshot -> {
 //                        if (!querySnapshot.isEmpty()) {
 //                            if (!invitedUsers.contains(invitee)) {
-//                                invitedUsers.add(invitee);           // ✅ 加入清單
-//                                updateInvitedList();                 // ✅ 更新畫面
+//                                invitedUsers.add(invitee);           // 加入清單
+//                                updateInvitedList();                 // 更新畫面
 //                            }
 //                            Toast.makeText(getContext(), "已送出邀請給：" + invitee, Toast.LENGTH_SHORT).show();
 //                            dialog.dismiss();

@@ -2,6 +2,7 @@ package com.example.afinal;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.ImageButton;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -23,11 +24,20 @@ public class MainActivity2 extends AppCompatActivity {
 
         // 預設載入 UserFragment
         if (savedInstanceState == null) {
-            getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.fragment_main, new UserFragment())
-                    .commit();
+            String target = getIntent().getStringExtra("navigate_to");
+            Log.d("IntentDebug", "MainActivity2 received navigate_to = " + target);
+
+            if (target == null) {
+                getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_main, new UserFragment())
+                        .commit();
+            } else {
+                handleNavigation(getIntent());
+            }
         }
+
+
         imb=findViewById(R.id.button);
         imb.setOnClickListener(v -> {
             Intent intent = new Intent(MainActivity2.this, MainActivity.class);
@@ -61,4 +71,27 @@ public class MainActivity2 extends AppCompatActivity {
 
 
     }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent); // 更新 Intent，讓 getIntent() 取得最新的
+        handleNavigation(intent);
+    }
+    private void handleNavigation(Intent intent) {
+        if (intent != null) {
+            String target = intent.getStringExtra("navigate_to");
+            Log.d("IntentDebug", "handleNavigation received navigate_to = " + target);
+
+            if ("group".equals(target)) {
+                getSupportFragmentManager()
+                        .beginTransaction()
+                        .replace(R.id.fragment_main, new GroupFragment())
+                        .commit();
+            }
+        }
+    }
+
+
+
 }

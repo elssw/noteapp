@@ -84,7 +84,7 @@ public class JoinGroupActivity extends AppCompatActivity {
                 Toast.makeText(this, "你已在群組中", Toast.LENGTH_SHORT).show();
             }
 
-            closeJoinGroupActivity();
+            goToGroupFragment();
         });
 
         btnReject.setOnClickListener(v -> {
@@ -92,7 +92,7 @@ public class JoinGroupActivity extends AppCompatActivity {
             db.collection("invitations")
                     .document(invitedUid + "_" + groupName)
                     .delete(); // 可選：拒絕也可清除邀請紀錄
-            closeJoinGroupActivity();
+            goToGroupFragment();
         });
     }
 
@@ -113,7 +113,7 @@ public class JoinGroupActivity extends AppCompatActivity {
         // 狀況 2：登入的 email ≠ 被邀請的 email
         if (!currentEmail.equals(invitedUid)) {
             Toast.makeText(this, "無權使用此邀請連結，請使用正確帳號登入", Toast.LENGTH_SHORT).show();
-            closeJoinGroupActivity();
+            goToGroupFragment();
             return;
         }
 
@@ -125,14 +125,14 @@ public class JoinGroupActivity extends AppCompatActivity {
                     if (!snapshot.exists()) {
                         // invitation 不存在
                         Toast.makeText(this, "找不到邀請紀錄，請確認邀請是否有效", Toast.LENGTH_SHORT).show();
-                        closeJoinGroupActivity();
+                        goToGroupFragment();
                         return;
                     }
 
                     inviterId = snapshot.getString("invited_by");
                     if (inviterId == null) {
                         Toast.makeText(this, "邀請資料錯誤", Toast.LENGTH_SHORT).show();
-                        closeJoinGroupActivity();
+                        goToGroupFragment();
                         return;
                     }
 
@@ -143,7 +143,7 @@ public class JoinGroupActivity extends AppCompatActivity {
                             .addOnSuccessListener(doc -> {
                                 if (!doc.exists()) {
                                     Toast.makeText(this, "無法取得群組資料", Toast.LENGTH_SHORT).show();
-                                    closeJoinGroupActivity();
+                                    goToGroupFragment();
                                     return;
                                 }
 
@@ -155,7 +155,7 @@ public class JoinGroupActivity extends AppCompatActivity {
                                     ArrayList<String> members = (ArrayList<String>) membersObj;
                                     if (members.contains(invitedUid)) {
                                         Toast.makeText(this, "已在群組中", Toast.LENGTH_SHORT).show();
-                                        closeJoinGroupActivity();
+                                        goToGroupFragment();
                                         return;
                                     }
                                 }
@@ -164,20 +164,26 @@ public class JoinGroupActivity extends AppCompatActivity {
                             })
                             .addOnFailureListener(e -> {
                                 Toast.makeText(this, "讀取群組資料失敗", Toast.LENGTH_SHORT).show();
-                                closeJoinGroupActivity();
+                                goToGroupFragment();
                             });
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "讀取邀請資料失敗", Toast.LENGTH_SHORT).show();
-                    closeJoinGroupActivity();
+                    goToGroupFragment();
                 });
     }
 
 
 
-    private void closeJoinGroupActivity() {
-        finish(); // 關閉 JoinGroupActivity
+    private void goToGroupFragment() {
+        Intent intent = new Intent(this, MainActivity2.class);
+        intent.putExtra("navigate_to", "group"); // 傳送要跳轉的 fragment 資訊
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        Log.d("IntentDebug", "goToGroupFragment() called,navigate_to = group");
+        startActivity(intent);
+        finish(); // 結束 JoinGroupActivity
     }
+
 
     private void goToSignInActivity() {
         Intent intent = new Intent(this, SignInActivity.class);
