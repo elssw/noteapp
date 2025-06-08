@@ -28,6 +28,7 @@ import androidx.fragment.app.Fragment;
 import com.example.afinal.GroupDetail;
 import com.example.afinal.R;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
@@ -39,11 +40,11 @@ import java.util.Map;
 
 //TODO:即時更新群組
 public class GroupFragment extends Fragment {
-
+    Map<String, String> groupIdMap = new HashMap<>();
     private LinearLayout groupContainer;
     private EditText etSearchGroup;
     private Context context;
-
+    private ArrayList<String> groupid;
     private ArrayList<String> groupNames;
     private ArrayList<String> allGroupNames;
     private HashMap<String, Integer> groupMembers = new HashMap<>();
@@ -60,10 +61,10 @@ public class GroupFragment extends Fragment {
 
         groupContainer = view.findViewById(R.id.groupContainer);
         etSearchGroup = view.findViewById(R.id.etSearchGroup);
-
+        groupIdMap = new HashMap<>();
         groupNames = new ArrayList<>();
         allGroupNames = new ArrayList<>();
-
+        groupid = new ArrayList<>();
 //        addDummyGroups();
 
         etSearchGroup.addTextChangedListener(new TextWatcher() {
@@ -75,7 +76,32 @@ public class GroupFragment extends Fragment {
             }
         });
 
-        refreshGroupItems();
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        SharedPreferences prefs = requireContext().getSharedPreferences("login", Context.MODE_PRIVATE);
+        String userId = prefs.getString("userid", "0");
+        if (!userId.equals("0")) {
+            db.collection("users")
+                    .document(userId)
+                    .collection("group")
+                    .get()
+                    .addOnSuccessListener(querySnapshot -> {
+                        groupIdMap.clear(); // 清空舊對應資料
+                        groupid.clear();
+                        for (QueryDocumentSnapshot doc : querySnapshot) {
+                            String groupName = doc.getString("group_name");
+                            String docId = doc.getId();
+                            groupid.add(docId);
+                            if (groupName != null) {
+                                groupIdMap.put(docId,groupName); // 🔑 儲存對應
+                            }
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e("Firestore", "載入群組失敗：" + e.getMessage());
+                    });
+
+        }
+        //refreshGroupItems();
         return view;
     }
 
@@ -96,22 +122,56 @@ public class GroupFragment extends Fragment {
     private void refreshGroupItems() {
         allGroupNames.clear();
         allGroupNames.addAll(groupNames);
-        filterGroups(etSearchGroup.getText().toString());
+
+//        filterGroups(etSearchGroup.getText().toString());
     }
 
     private void filterGroups(String keyword) {
         groupContainer.removeAllViews();
-//        addGroupItem("新增群組", true,"");
+        addGroupItem("新增群組", true,"","");
+        List<String> matchedKeys = new ArrayList<>();
 
-        int matchedCount = 0;
-        for (String name : allGroupNames) {
-            if (name.contains(keyword)) {
-          //      addGroupItem(name, false);
-                matchedCount++;
+        for (Map.Entry<String, String> entry : groupIdMap.entrySet()) {
+            if (entry.getValue().equals(keyword)) {
+                matchedKeys.add(entry.getKey()); // 收集所有符合的 key
             }
         }
 
-        if (matchedCount == 0) {
+        SharedPreferences prefs = requireContext().getSharedPreferences("login", Context.MODE_PRIVATE);
+        String userId = prefs.getString("userid", "0");
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        if (!userId.equals("0")) {
+
+
+            for (String groid : matchedKeys) {
+                DocumentReference groupDocRef = db.collection("users")
+                        .document(userId)
+                        .collection("group")
+                        .document(groid);
+
+                groupDocRef.get().addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        String groupName = documentSnapshot.getString("group_name");
+                        String groupImage = documentSnapshot.getString("group_image");
+                        Bitmap bitmap;
+                        if(groupImage.equals("123")){
+                            bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.group_default_photo);
+                            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream);
+                            groupImage= Base64.encodeToString(stream.toByteArray(), Base64.DEFAULT);
+                        }
+                        addGroupItem(groupName,false,groupImage,groid);
+
+                        // 可在此處加入 UI 更新或資料儲存邏輯
+                    } else {
+                        Log.e("Firestore", "找不到群組文件: " + groid);
+                    }
+                }).addOnFailureListener(e -> {
+                    Log.e("Firestore", "讀取群組文件失敗: " + e.getMessage());
+                });
+            }
+        }
+        if (matchedKeys.size() == 0) {
             TextView emptyText = new TextView(context);
             emptyText.setText("沒有符合的群組");
             emptyText.setTextSize(16f);
@@ -122,7 +182,7 @@ public class GroupFragment extends Fragment {
         }
     }
 
-    private void addGroupItem(String groupName, boolean isAddButton, String base64Image) {
+    private void addGroupItem(String groupName, boolean isAddButton, String base64Image,String gid) {
         LinearLayout rowLayout = new LinearLayout(context);
         rowLayout.setOrientation(LinearLayout.HORIZONTAL);
         rowLayout.setPadding(24, 24, 24, 24);
@@ -192,7 +252,7 @@ public class GroupFragment extends Fragment {
 
         rowLayout.setOnLongClickListener(v -> {
             if (!isAddButton) {
-                showEditDeleteDialog(groupName);
+                showEditDeleteDialog(gid);
             }
             return true;
         });
@@ -225,51 +285,67 @@ public class GroupFragment extends Fragment {
         groupContainer.addView(rowLayout);
     }
 
-    private void showEditDeleteDialog(String groupName) {//TODO:刪除群組
+    private void showEditDeleteDialog(String groid) {//TODO:刪除群組
         androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(context);
         builder.setTitle("選擇操作")
-                .setItems(new CharSequence[]{"編輯群組名稱", "刪除群組"}, (dialog, which) -> {
+                .setItems(new CharSequence[]{"編輯群組名稱", "退出群組"}, (dialog, which) -> {
                     if (which == 0) {
-                        showRenameDialog(groupName);
+                        showRenameDialog(groid);
                     } else if (which == 1) {
-                        groupNames.remove(groupName);
-                        groupMembers.remove(groupName);
-                        groupRecords.remove(groupName);
-                        refreshGroupItems();
+                        FirebaseFirestore db = FirebaseFirestore.getInstance();
+                        SharedPreferences prefs = requireContext().getSharedPreferences("login", Context.MODE_PRIVATE);
+                        String userId = prefs.getString("userid", "0");
+                        if (!userId.equals("0")) {
+                            // 先取得該群組 document 的內容
+                            DocumentReference groupDocRef = db.collection("users")
+                                    .document(userId)
+                                    .collection("group")
+                                    .document(groid);
+
+                            groupDocRef.get()
+                                    .addOnSuccessListener(documentSnapshot -> {
+                                        if (documentSnapshot.exists()) {
+                                            Map<String, Object> groupData = documentSnapshot.getData();
+                                            if (groupData != null && groupData.containsKey("members")) {
+                                                List<String> members = (List<String>) groupData.get("members");
+                                                members.remove(userId); // 移除自己的 userId
+                                                groupData.put("members", members); // 更新 members 欄位
+
+                                                // 找出所有成員，更新每位成員的群組資料
+                                                for (String uid : members) {
+                                                    db.collection("users")
+                                                            .document(uid)
+                                                            .collection("group")
+                                                            .document(groid)
+                                                            .update("members", members)
+                                                            .addOnSuccessListener(unused -> Log.d("Firestore", "已從 " + uid + " 的群組中移除 userId"))
+                                                            .addOnFailureListener(e -> Log.e("Firestore", "移除失敗：" + e.getMessage()));
+                                                }
+                                            }
+                                        }
+
+                                        // 最後刪除自己底下的這筆群組資料
+                                        groupDocRef.delete()
+                                                .addOnSuccessListener(unused -> {
+                                                    Toast.makeText(context, "成功退出群組", Toast.LENGTH_SHORT).show();
+                                                    loadGroupsFromFirestore();
+                                                })
+                                                .addOnFailureListener(e -> {
+                                                    Toast.makeText(context, "退出群組失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                                });
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Toast.makeText(context, "讀取群組資料失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                    });
+                        }
                     }
                 })
                 .show();
     }
 
-//    private void showRenameDialog(String oldName) {//TODO:修群組名
-//        EditText input = new EditText(context);
-//        input.setText(oldName);
-//        input.setSelection(oldName.length());
-//
-//        new androidx.appcompat.app.AlertDialog.Builder(context)
-//                .setTitle("重新命名群組")
-//                .setView(input)
-//                .setPositiveButton("確定", (dialog, which) -> {
-//                    String newName = input.getText().toString().trim();
-//                    if (!newName.isEmpty() && !groupNames.contains(newName)) {
-//                        int member = groupMembers.getOrDefault(oldName, 0);
-//                        int record = groupRecords.getOrDefault(oldName, 0);
-//                        groupNames.remove(oldName);
-//                        groupNames.add(newName);
-//                        groupMembers.remove(oldName);
-//                        groupRecords.remove(oldName);
-//                        groupMembers.put(newName, member);
-//                        groupRecords.put(newName, record);
-//                        refreshGroupItems();
-//                    } else {
-//                        Toast.makeText(context, "名稱重複或為空", Toast.LENGTH_SHORT).show();
-//                    }
-//                })
-//                .setNegativeButton("取消", null)
-//                .show();
-//    }
 
-    private void showRenameDialog(String oldName) {
+    private void showRenameDialog(String oldid) {
+        String oldName=groupIdMap.get(oldid);
         EditText input = new EditText(context);
         input.setText(oldName);
         input.setSelection(oldName.length());
@@ -280,8 +356,8 @@ public class GroupFragment extends Fragment {
                 .setPositiveButton("確定", (dialog, which) -> {
                     String newName = input.getText().toString().trim();
 
-                    if (newName.isEmpty() || groupNames.contains(newName)) {
-                        Toast.makeText(context, "名稱重複或為空", Toast.LENGTH_SHORT).show();
+                    if (newName.isEmpty() ) {
+                        Toast.makeText(context, "名稱為空", Toast.LENGTH_SHORT).show();
                         return;
                     }
 
@@ -294,122 +370,57 @@ public class GroupFragment extends Fragment {
                     groupRecords.remove(oldName);
                     groupMembers.put(newName, member);
                     groupRecords.put(newName, record);
-                    refreshGroupItems();
+//                    refreshGroupItems();
                     SharedPreferences prefs = requireContext().getSharedPreferences("login", Context.MODE_PRIVATE);
                     String userId = prefs.getString("userid", "0");
                     FirebaseFirestore db = FirebaseFirestore.getInstance();
                     if (!userId.equals("0")) {
-                        // Firestore 更新邏輯
                         DocumentReference groupDoc = db.collection("users")
                                 .document(userId)
                                 .collection("group")
-                                .document(oldName);
+                                .document(oldid);
 
                         groupDoc.get().addOnSuccessListener(docSnapshot -> {
                             if (!docSnapshot.exists()) {
-                                Log.e("Firestore", "找不到群組：" + oldName);
+                                Log.e("Firestore", "找不到群組：" + oldid);
                                 return;
                             }
 
                             Map<String, Object> oldData = docSnapshot.getData();
-                            List<String> members = (List<String>) oldData.get("members");
+                            if (oldData == null) return;
 
+                            List<String> members = (List<String>) oldData.get("members");
                             if (members == null) {
                                 Log.e("Firestore", "群組沒有 members 欄位");
                                 return;
                             }
 
+                            // 🔄 開始更新所有成員的 group_name 欄位
                             for (String uid : members) {
-                                DocumentReference newDocRef = db.collection("users").document(uid)
-                                        .collection("group").document(newName);
-
-                                newDocRef.get().addOnSuccessListener(snapshot -> {
-//                                    if (snapshot.exists()) {
-//                                        Log.w("Firestore", "使用者 " + uid + " 已有同名群組 " + newName);
-//                                        return;
-//                                    }
-
-                                    DocumentReference oldDocRef = db.collection("users").document(uid)
-                                            .collection("group").document(oldName);
-
-                                    oldDocRef.get().addOnSuccessListener(oldSnapshot -> {
-                                        if (oldSnapshot.exists()) {
-                                            Map<String, Object> data = oldSnapshot.getData();
-                                            newDocRef.set(data)
-                                                    .addOnSuccessListener(unused -> {
-                                                        oldDocRef.delete();  // 刪除舊的
-                                                        Log.d("Firestore", "群組重新命名成功 for " + uid);
-                                                    })
-                                                    .addOnFailureListener(e -> {
-                                                        Log.e("Firestore", "寫入新名稱失敗 for " + uid + ": " + e.getMessage());
-                                                    });
-                                        }
-                                    }).addOnFailureListener(e -> {
-                                        Log.e("Firestore", "讀取舊群組失敗 for " + uid + ": " + e.getMessage());
-                                    });
-
-                                }).addOnFailureListener(e -> {
-                                    Log.e("Firestore", "檢查新名稱失敗 for " + uid + ": " + e.getMessage());
-                                });
+                                db.collection("users")
+                                        .document(uid)
+                                        .collection("group")
+                                        .document(oldid)
+                                        .update("group_name", newName)
+                                        .addOnSuccessListener(unused -> {
+                                            Log.d("Firestore", "群組名稱成功更新為：" + newName + " (for " + uid + ")");
+                                        })
+                                        .addOnFailureListener(e -> {
+                                            Log.e("Firestore", "更新失敗 for " + uid + ": " + e.getMessage());
+                                        });
                             }
-                        }).addOnFailureListener(e -> {
-                            Log.e("Firestore", "讀取原始群組失敗：" + e.getMessage());
-                        });
 
-//                        db.collection("users")
-//                                .document(userId)
-//                                .collection("group")
-//                                .get()
-//                                .addOnSuccessListener(querySnapshot -> {
-//                                    groupNames.clear();  // 清空舊資料
-//                                    for (QueryDocumentSnapshot doc : querySnapshot) {
-//                                        String groupName = doc.getId(); // 使用 document 名稱為群組名稱
-//
-//                                        List<String> members = (List<String>) doc.get("members");
-//                                        int count = (members != null) ? members.size() : 1;
-//                                        for (String uid : members) {
-//                                            DocumentReference newDocRef = db.collection("users").document(uid)
-//                                                    .collection("group").document(newName);
-//
-//                                            newDocRef.get().addOnSuccessListener(snapshot -> {
-//                                                if (snapshot.exists()) {
-//                                                    Log.w("Firestore", "使用者 " + uid + " 已有同名群組 " + newName);
-//                                                    return;
-//                                                }
-//
-//                                                DocumentReference oldDocRef = db.collection("users").document(uid)
-//                                                        .collection("group").document(oldName);
-//
-//                                                oldDocRef.get().addOnSuccessListener(oldSnapshot -> {
-//                                                    if (oldSnapshot.exists()) {
-//                                                        Map<String, Object> oldData = oldSnapshot.getData();
-//
-//                                                        newDocRef.set(oldData)  // 新名稱寫入資料
-//                                                                .addOnSuccessListener(unused -> {
-//                                                                    oldDocRef.delete();  // 刪除舊的
-//                                                                    Log.d("Firestore", "群組重新命名成功 for " + uid);
-//                                                                })
-//                                                                .addOnFailureListener(e ->
-//                                                                        Log.e("Firestore", "寫入新名稱失敗 for " + uid + ": " + e.getMessage())
-//                                                                );
-//                                                    }
-//                                                }).addOnFailureListener(e ->
-//                                                        Log.e("Firestore", "讀取舊群組失敗 for " + uid + ": " + e.getMessage())
-//                                                );
-//
-//                                            }).addOnFailureListener(e ->
-//                                                    Log.e("Firestore", "檢查新名稱失敗 for " + uid + ": " + e.getMessage())
-//                                            );
-//                                        }
-//                                    }
-//
-//                                })
-//                                .addOnFailureListener(e -> Log.e("Firestore", "讀取群組失敗：" + e.getMessage()));
+                            // ✅ 可選：重新載入 UI 群組
+                            loadGroupsFromFirestore();
+                        }).addOnFailureListener(e -> {
+                            Log.e("Firestore", "讀取群組資料失敗：" + e.getMessage());
+                        });
                     }
 
                 })
                 .setNegativeButton("取消", null)
                 .show();
+
     }
 
     @Override
@@ -427,7 +438,7 @@ public class GroupFragment extends Fragment {
             setArguments(null); // 避免重複新增
         }
         loadGroupsFromFirestore();
-        refreshGroupItems();
+//        refreshGroupItems();
     }
 
     private void loadGroupsFromFirestore() {
@@ -445,9 +456,9 @@ public class GroupFragment extends Fragment {
                     .addOnSuccessListener(querySnapshot -> {
                         groupNames.clear();  // 清空舊資料
                         for (QueryDocumentSnapshot doc : querySnapshot) {
-                            String groupName = doc.getId(); // 使用 document 名稱為群組名稱
+                            String groupName = doc.getString("group_name"); // 使用 document 名稱為群組名稱
                             groupNames.add(groupName);
-
+                            String id=doc.getId();
                             // 讀取圖片（可選）
                             String base64Image = doc.getString("group_image");
                             Bitmap bitmap;
@@ -464,9 +475,9 @@ public class GroupFragment extends Fragment {
                             groupMembers.put(groupName, count);
                             groupRecords.put(groupName, 0);
 
-                            addGroupItem(groupName, false,base64Image); // 加入畫面
+                            addGroupItem(groupName, false,base64Image,id); // 加入畫面
                         }
-                        addGroupItem("新增群組", true,"");
+                        addGroupItem("新增群組", true,"","");
 //                        addGroupItem("", true,""); // 最後加入「新增群組」按鈕
                     })
                     .addOnFailureListener(e -> Log.e("Firestore", "讀取群組失敗：" + e.getMessage()));

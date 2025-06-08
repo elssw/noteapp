@@ -23,11 +23,12 @@ import androidx.core.content.ContextCompat;
 import com.example.afinal.model.Member;
 import com.google.android.flexbox.FlexboxLayout;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.io.IOException;
 import java.util.*;
 
-public class GroupCharge2 extends AppCompatActivity {
+public class GroupChargeEdit extends AppCompatActivity {
 
     // 主要 UI 元件
     private ImageView imgPreview; // 顯示選取或拍攝的圖片
@@ -37,6 +38,10 @@ public class GroupCharge2 extends AppCompatActivity {
 
     // 群組成員清單（實際使用時應改為從後端/Intent 取得）
     private List<Member> members = new ArrayList<>();
+    private ArrayList<String> originalPayers;
+    private ArrayList<Double> payerAmounts;
+    private ArrayList<String> originalParticipants;
+    private String groupId;
 
     // 記錄付款人對應的輸入框（姓名 => 金額輸入欄）
     private Map<String, EditText> payerInputs = new HashMap<>();
@@ -91,7 +96,7 @@ public class GroupCharge2 extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_group_charge2);
+        setContentView(R.layout.activity_group_charge_edit);
 
         // 綁定 UI 元件
         imgPreview = findViewById(R.id.imgPreview);
@@ -101,6 +106,29 @@ public class GroupCharge2 extends AppCompatActivity {
         memberSelectionContainer = findViewById(R.id.memberSelectionContainer);
         tvDate = findViewById(R.id.tvDate);
         tvSelectPayers = findViewById(R.id.tvSelectPayers);
+
+        Intent intent = getIntent();
+        groupId = intent.getStringExtra("groupId");
+
+        if (groupId == null || groupId.isEmpty()) {
+            Toast.makeText(this, "無法取得群組 ID，請重新進入", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        // 接收原本的紀錄資料並填入 UI
+        String recordId = intent.getStringExtra("recordId");
+        String originalNote = intent.getStringExtra("note");
+        double originalAmount = intent.getDoubleExtra("amount", 0);
+        String originalDate = intent.getStringExtra("date");
+        originalPayers = intent.getStringArrayListExtra("payers");
+        payerAmounts = (ArrayList<Double>) intent.getSerializableExtra("payerAmounts");
+        originalParticipants = intent.getStringArrayListExtra("participants");
+
+        // 先設定基本欄位
+        etNote.setText(originalNote);
+        etAmount.setText(String.valueOf(originalAmount));
+        tvDate.setText(originalDate);
 
         // 返回鍵
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
@@ -128,11 +156,8 @@ public class GroupCharge2 extends AppCompatActivity {
         SharedPreferences loginPrefs = getSharedPreferences("login", MODE_PRIVATE);
         myEmail = loginPrefs.getString("userid", ""); // 這是目前登入者的 email
 
-        // Firebase 成功載入完後會呼叫：
-        setupMembers();
-
         // 從 FireBase 抓取群組人員資料
-        Intent intent = getIntent();
+        intent = getIntent();
         String groupName = intent.getStringExtra("groupName");
 
         SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
@@ -178,17 +203,10 @@ public class GroupCharge2 extends AppCompatActivity {
                 Toast.makeText(this, "尚未載入群組成員", Toast.LENGTH_SHORT).show();
                 return;
             }
-
             String[] names = new String[members.size()];
             for (int i = 0; i < members.size(); i++) {
-                Member m = members.get(i);
-                if (m.getEmail().equals(myEmail)) {
-                    names[i] = myNickname;
-                } else {
-                    names[i] = m.getNickname();
-                }
+                names[i] = members.get(i).getNickname();
             }
-
             selectedPayers = new boolean[members.size()];
 
             new AlertDialog.Builder(this)
@@ -209,6 +227,37 @@ public class GroupCharge2 extends AppCompatActivity {
 
         // 點擊確認後計算分帳邏輯
         findViewById(R.id.btnConfirm).setOnClickListener(v -> calculateSplit());
+
+        // 刪除此筆分帳紀錄
+        // 刪除此筆分帳紀錄
+        findViewById(R.id.btnDelete).setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("確認刪除")
+                    .setMessage("確定要刪除此筆紀錄？")
+                    .setPositiveButton("刪除", (dialog, which) -> {
+                        // 這些變數在 onCreate 上方已經宣告過
+                        // 所以這裡直接用，不要再重複加型別
+                        db.collection("users")
+                                .document(userId)
+                                .collection("group")
+                                .document(groupName)
+                                .collection("records")
+                                .document(recordId)
+                                .delete()
+                                .addOnSuccessListener(aVoid -> {
+                                    Toast.makeText(this, "刪除成功", Toast.LENGTH_SHORT).show();
+                                    setResult(RESULT_OK);
+                                    finish();
+                                })
+                                .addOnFailureListener(e -> {
+                                    Toast.makeText(this, "刪除失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                });
+                    })
+                    .setNegativeButton("取消", null)
+                    .show();
+        });
+
+
     }
 
     // 顯示使用者選擇圖片來源（相簿 or 拍照）
@@ -243,22 +292,19 @@ public class GroupCharge2 extends AppCompatActivity {
             return;
         }
 
-        List<String> selectedMembers = new ArrayList<>();
-        for (int i = 0; i < memberSelectionContainer.getChildCount(); i++) {
-            CheckBox cb = (CheckBox) memberSelectionContainer.getChildAt(i);
-            if (cb.isChecked()) {
-                String nickname = cb.getText().toString();
-                String email = nicknameToEmail.get(nickname);
-                if (email != null) selectedMembers.add(email);
-            }
-        }
-
         double totalAmount;
         try {
             totalAmount = Double.parseDouble(totalStr);
         } catch (NumberFormatException e) {
             Toast.makeText(this, "金額格式錯誤", Toast.LENGTH_SHORT).show();
             return;
+        }
+
+        // 收集有被勾選的分帳成員
+        List<String> selectedMembers = new ArrayList<>();
+        for (int i = 0; i < memberSelectionContainer.getChildCount(); i++) {
+            CheckBox cb = (CheckBox) memberSelectionContainer.getChildAt(i);
+            if (cb.isChecked()) selectedMembers.add(cb.getText().toString());
         }
 
         if (selectedMembers.isEmpty()) {
@@ -269,11 +315,11 @@ public class GroupCharge2 extends AppCompatActivity {
         // 收集每位付款人實際輸入的付款金額
         Map<String, Double> actualPayments = new HashMap<>();
         for (Member payer : chosenPayers) {
-            String email = payer.getEmail();
-            EditText input = payerInputs.get(email);
+            String nickname = payer.getNickname();
+            EditText input = payerInputs.get(nickname);
             String value = input.getText().toString().trim();
             double paid = value.isEmpty() ? 0 : Double.parseDouble(value);
-            actualPayments.put(email, paid);
+            actualPayments.put(nickname, paid);
         }
 
         double perPerson = totalAmount / selectedMembers.size();
@@ -293,25 +339,10 @@ public class GroupCharge2 extends AppCompatActivity {
         allInvolved.addAll(selectedMembers);
         allInvolved.addAll(actualPayments.keySet());
 
-        for (String email : allInvolved) {
-            double paid = actualPayments.getOrDefault(email, 0.0);
-            boolean isParticipant = selectedMembers.contains(email);double balance;
-            if (isParticipant) {
-                balance = paid - perPerson; // 有參與分帳者
-            } else if (paid > 0) {
-                balance = paid; // 只付款但沒參與 → 應收全額
-            } else {
-                continue; // 沒有付款也沒參與 → 不顯示
-            }
-
-            String nameToShow;
-            if (email.equals(myEmail)) {
-                nameToShow = myNickname;
-            } else {
-                nameToShow = emailToNickname.getOrDefault(email, email);
-            }
-
-            result.append(nameToShow)
+        for (String name : allInvolved) {
+            double paid = actualPayments.getOrDefault(name, 0.0);
+            double balance = selectedMembers.contains(name) ? (paid - perPerson) : paid;
+            result.append(name)
                     .append(" 已付 NT$").append(paid)
                     .append(" → ")
                     .append(balance >= 0 ? "收回" : "應付")
@@ -319,39 +350,57 @@ public class GroupCharge2 extends AppCompatActivity {
                     .append("\n");
         }
 
+        List<String> selectedEmails = new ArrayList<>();
+        for (int i = 0; i < memberSelectionContainer.getChildCount(); i++) {
+            CheckBox cb = (CheckBox) memberSelectionContainer.getChildAt(i);
+            if (cb.isChecked()) {
+                String nickname = cb.getText().toString();
+                String email = nicknameToEmail.get(nickname);
+                selectedEmails.add(email);
+            }
+        }
 
         // 彈出結果對話框，並回傳資料到 GroupDetail（record 與 summary）
         new AlertDialog.Builder(this)
                 .setTitle("分帳結果")
                 .setMessage(result.toString())
                 .setPositiveButton("確認", (dialog, which) -> {
-                    String record = String.format("%s - NT$%.0f %s", dateText, totalAmount, note); // eg. 2025-06-04 - 900 晚餐
-                    Intent resultIntent = new Intent();
+                    Intent intent = getIntent();
+                    String recordId = intent.getStringExtra("recordId");
+                    String groupName = intent.getStringExtra("groupName");
 
-                    // 將 balance 結果組成 Map<String, Float>
-                    Map<String, Float> balancesToSend = new HashMap<>();
+                    SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
+                    String userId = prefs.getString("userid", "0");
 
-                    for (String email : allInvolved) {
-                        double paid = actualPayments.getOrDefault(email, 0.0);
-                        boolean isParticipant = selectedMembers.contains(email);
-                        double balance;
-                        if (isParticipant) {
-                            balance = paid - perPerson;
-                        } else if (paid > 0) {
-                            balance = paid;
-                        } else {
-                            continue;
-                        }
-                        balancesToSend.put(email, (float) balance);
-                    }
+                    FirebaseFirestore db = FirebaseFirestore.getInstance();
 
-                    // 轉成 JSON 傳出
-                    resultIntent.putExtra("balances", new com.google.gson.Gson().toJson(balancesToSend));
+                    Map<String, Object> updatedRecord = new HashMap<>();
+                    updatedRecord.put("note", note);
+                    updatedRecord.put("amount", totalAmount);
+                    updatedRecord.put("date", dateText);
+                    updatedRecord.put("summary", result.toString());
+                    updatedRecord.put("payers", new ArrayList<>(actualPayments.keySet()));
+                    updatedRecord.put("payerAmounts", new ArrayList<>(actualPayments.values()));
+                    updatedRecord.put("participants", selectedEmails);
 
-                    resultIntent.putExtra("summary", result.toString());
-                    resultIntent.putExtra("record", record);
-                    setResult(RESULT_OK, resultIntent);
-                    finish();
+                    db.collection("users")
+                            .document(userId)
+                            .collection("group")
+                            .document(groupName)
+                            .collection("records")
+                            .document(recordId)
+                            .update(updatedRecord)
+                            .addOnSuccessListener(aVoid -> {
+                                Toast.makeText(this, "修改成功", Toast.LENGTH_SHORT).show();
+                                Intent resultIntent = new Intent();
+                                resultIntent.putExtra("summary", result.toString());
+                                resultIntent.putExtra("record", String.format("%s - NT$%.0f %s", dateText, totalAmount, note));
+                                setResult(RESULT_OK, resultIntent);
+                                finish();
+                            })
+                            .addOnFailureListener(e -> {
+                                Toast.makeText(this, "修改失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            });
                 })
                 .show();
     }
@@ -384,21 +433,19 @@ public class GroupCharge2 extends AppCompatActivity {
 
         List<String> payerNames = new ArrayList<>();
         for (Member payer : chosenPayers) {
-            String displayName = payer.getEmail().equals(myEmail) ? myNickname : payer.getNickname();
-            payerNames.add(displayName);
+            payerNames.add(payer.getNickname());
         }
         tvSelectPayers.setText("付款人：" + String.join(", ", payerNames));
 
         for (Member payer : chosenPayers) {
-            String email = payer.getEmail();
-            String displayName = email.equals(myEmail) ? myNickname : payer.getNickname();
+            String nickname = payer.getNickname();
 
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setPadding(0, 8, 0, 8);
 
             TextView tv = new TextView(this);
-            tv.setText(displayName + "：");
+            tv.setText(nickname + "：");
             tv.setTextSize(16);
             tv.setWidth(120);
 
@@ -407,7 +454,8 @@ public class GroupCharge2 extends AppCompatActivity {
             input.setHint("付款金額");
             input.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-            payerInputs.put(email, input); // 用 email 當 key 確保唯一
+            payerInputs.put(nickname, input);
+
             row.addView(tv);
             row.addView(input);
             payerAmountContainer.addView(row);
@@ -415,26 +463,70 @@ public class GroupCharge2 extends AppCompatActivity {
     }
 
     // 動態載入人員
+    // 動態載入人員
     private void setupMembers() {
-        memberSelectionContainer.removeAllViews();
-        payerInputs.clear();
-        selectedPayers = new boolean[members.size()];
-        chosenPayers.clear();
-        nicknameToEmail.clear();
-        emailToNickname.clear();
+        SharedPreferences pref = getSharedPreferences("prefs", MODE_PRIVATE);
+        myEmail = pref.getString("email", "");
+        myNickname = pref.getString("nickname", "");
 
-        for (int i = 0; i < members.size(); i++) {
-            Member m = members.get(i);
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
 
-            String displayName = m.getEmail().equals(myEmail) ? myNickname : m.getNickname();
+        db.collection("groups").document(groupId)
+                .collection("members")
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    members.clear();
+                    nicknameToEmail.clear();
+                    emailToNickname.clear();
 
-            nicknameToEmail.put(displayName, m.getEmail());  // 用顯示名稱當 key 才對！
-            emailToNickname.put(m.getEmail(), displayName);  // 也一併更新為統一使用 displayName
+                    // 初始化 selectedPayers 這邊才安全
+                    selectedPayers = new boolean[queryDocumentSnapshots.size()];
 
-            CheckBox cb = new CheckBox(this);
-            cb.setText(displayName);
-            cb.setChecked(true);
-            memberSelectionContainer.addView(cb);
-        }
+                    Map<String, Double> originalPaymentMap = new HashMap<>();
+                    if (originalPayers != null && payerAmounts != null) {
+                        for (int i = 0; i < originalPayers.size(); i++) {
+                            originalPaymentMap.put(originalPayers.get(i), payerAmounts.get(i));
+                        }
+                    }
+
+                    int i = 0;
+                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                        String email = doc.getString("email");
+                        String nickname = doc.getString("nickname");
+                        Member m = new Member(email, nickname);
+                        members.add(m);
+                        nicknameToEmail.put(nickname, email);
+                        emailToNickname.put(email, nickname);
+
+                        // 建立 checkbox
+                        String displayName = email.equals(myEmail) ? myNickname : nickname;
+                        CheckBox cb = new CheckBox(this);
+                        cb.setText(displayName);
+                        cb.setChecked(originalParticipants != null && originalParticipants.contains(email));
+                        memberSelectionContainer.addView(cb);
+
+                        // 加入已選付款人
+                        if (originalPayers.contains(email)) {
+                            chosenPayers.add(m);
+                            selectedPayers[i] = true;
+                        }
+
+                        i++;
+                    }
+
+                    updatePayerInputFields();
+
+                    for (Map.Entry<String, EditText> entry : payerInputs.entrySet()) {
+                        String nickname = entry.getKey();
+                        EditText input = entry.getValue();
+
+                        String email = nicknameToEmail.get(nickname);
+                        if (email != null) {
+                            Double amt = originalPaymentMap.get(email);
+                            if (amt != null) input.setText(String.valueOf(amt));
+                        }
+                    }
+
+                });
     }
 }

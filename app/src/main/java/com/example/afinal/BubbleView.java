@@ -9,6 +9,7 @@ import android.view.View;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class BubbleView extends View {
 
@@ -16,6 +17,7 @@ public class BubbleView extends View {
         String name;
         float amount;
         int color;
+        float cx, cy, radius;
 
         Bubble(String name, float amount, int color) {
             this.name = name;
@@ -27,6 +29,10 @@ public class BubbleView extends View {
     private final List<Bubble> bubbles = new ArrayList<>();
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Random random = new Random();
+
+    private static final float minRadius = 60f;
+    private static final float maxRadius = 150f;
 
     public BubbleView(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -37,10 +43,29 @@ public class BubbleView extends View {
 
     public void setData(List<String> names, List<Float> amounts) {
         bubbles.clear();
+        float maxAmount = 0f;
+
+        // 找出最大金額（取絕對值）
+        for (Float amt : amounts) {
+            maxAmount = Math.max(maxAmount, Math.abs(amt));
+        }
+
+        // 建立泡泡資料
         for (int i = 0; i < names.size(); i++) {
             float amount = amounts.get(i);
             int color = amount >= 0 ? Color.parseColor("#2196F3") : Color.parseColor("#F44336");
-            bubbles.add(new Bubble(names.get(i), amount, color));
+
+            Bubble bubble = new Bubble(names.get(i), amount, color);
+
+            // 根據比例設定半徑
+            if (maxAmount > 0) {
+                float scale = Math.abs(amount) / maxAmount;
+                bubble.radius = minRadius + scale * (maxRadius - minRadius);
+            } else {
+                bubble.radius = minRadius; // 若全部都是 0
+            }
+
+            bubbles.add(bubble);
         }
         invalidate();
     }
@@ -48,25 +73,50 @@ public class BubbleView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-
         if (bubbles.isEmpty()) return;
 
         int width = getWidth();
         int height = getHeight();
-        int centerY = height / 2;
-        int spacing = width / (bubbles.size() + 1);
+        int maxTries = 300;
 
-        for (int i = 0; i < bubbles.size(); i++) {
-            Bubble b = bubbles.get(i);
-            float radius = Math.max(50f, Math.min(150f, Math.abs(b.amount) * 2f));
-            float cx = spacing * (i + 1);
-            float cy = centerY;
+        List<Bubble> placed = new ArrayList<>();
 
-            paint.setColor(b.color);
-            canvas.drawCircle(cx, cy, radius, paint);
+        for (Bubble b : bubbles) {
+            boolean placedSuccessfully = false;
 
-            canvas.drawText(b.name, cx, cy - 10, textPaint);
-            canvas.drawText(String.format("$%.0f", b.amount), cx, cy + 30, textPaint);
+            for (int attempt = 0; attempt < maxTries; attempt++) {
+                float padding = 12f;
+                float cx = b.radius + padding + random.nextFloat() * (width - 2 * b.radius - 2 * padding);
+                float cy = b.radius + padding + random.nextFloat() * (height - 2 * b.radius - 2 * padding);
+
+                boolean overlap = false;
+                for (Bubble other : placed) {
+                    float dx = cx - other.cx;
+                    float dy = cy - other.cy;
+                    float distance = (float) Math.sqrt(dx * dx + dy * dy);
+                    if (distance < b.radius + other.radius + 12f) {
+                        overlap = true;
+                        break;
+                    }
+                }
+
+                if (!overlap) {
+                    b.cx = cx;
+                    b.cy = cy;
+                    placedSuccessfully = true;
+                    break;
+                }
+            }
+
+            if (placedSuccessfully) {
+                placed.add(b);
+
+                paint.setColor(b.color);
+                canvas.drawCircle(b.cx, b.cy, b.radius, paint);
+
+                canvas.drawText(b.name, b.cx, b.cy - 10, textPaint);
+                canvas.drawText(String.format("$%.0f", b.amount), b.cx, b.cy + 30, textPaint);
+            }
         }
     }
 }
