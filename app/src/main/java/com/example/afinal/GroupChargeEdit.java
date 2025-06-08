@@ -42,7 +42,7 @@ public class GroupChargeEdit extends AppCompatActivity {
     private ArrayList<Double> payerAmounts;
     private ArrayList<String> originalParticipants;
     private String groupId;
-
+    private boolean isMembersLoaded = false;
     // 記錄付款人對應的輸入框（姓名 => 金額輸入欄）
     private Map<String, EditText> payerInputs = new HashMap<>();
 
@@ -118,12 +118,41 @@ public class GroupChargeEdit extends AppCompatActivity {
 
         // 接收原本的紀錄資料並填入 UI
         String recordId = intent.getStringExtra("recordId");
-        String originalNote = intent.getStringExtra("note");
-        double originalAmount = intent.getDoubleExtra("amount", 0);
+        String original = intent.getStringExtra("content");
+        // 移除 NT$，並用空白分割
+        String[] parts = original.replace("NT$", "").split("\\s+", 2);
+
+        String originalAmount = parts[0];  // "220"
+        String originalNote = parts.length > 1 ? parts[1] : "";  // "阿阿"（若無則給空字串）
+
         String originalDate = intent.getStringExtra("date");
         originalPayers = intent.getStringArrayListExtra("payers");
         payerAmounts = (ArrayList<Double>) intent.getSerializableExtra("payerAmounts");
         originalParticipants = intent.getStringArrayListExtra("participants");
+        Log.d("RecordDebug", "recordId: " + recordId);
+        Log.d("RecordDebug", "originalNote: " + originalNote);
+        Log.d("RecordDebug", "originalAmount: " + originalAmount);
+        Log.d("RecordDebug", "originalDate: " + originalDate);
+        if (originalPayers != null) {
+            for (String payer : originalPayers) {
+                Log.d("RecordDebug", "Payer: " + payer);
+            }
+        }
+
+        if (payerAmounts != null) {
+            for (Double amt : payerAmounts) {
+                Log.d("RecordDebug", "Payer Amount: " + amt);
+            }
+        }
+
+        if (originalParticipants != null) {
+            for (String participant : originalParticipants) {
+                Log.d("RecordDebug", "Participant: " + participant);
+            }
+        }
+//        Log.d("RecordDebug", "originalPayers: " + originalPayers);
+//        Log.d("RecordDebug", "payerAmounts: " + payerAmounts);
+//        Log.d("RecordDebug", "originalParticipants: " + originalParticipants);
 
         // 先設定基本欄位
         etNote.setText(originalNote);
@@ -149,17 +178,17 @@ public class GroupChargeEdit extends AppCompatActivity {
         });
 
         // 使用者未設置暱稱時，預設“我”
-        SharedPreferences settingPrefs = getSharedPreferences("setting_prefs", MODE_PRIVATE);
-        myNickname = settingPrefs.getString("nickname", "我");
-
-        // 判斷是否是當前使用者，用 email 比對，改為暱稱
-        SharedPreferences loginPrefs = getSharedPreferences("login", MODE_PRIVATE);
-        myEmail = loginPrefs.getString("userid", ""); // 這是目前登入者的 email
+//        SharedPreferences settingPrefs = getSharedPreferences("setting_prefs", MODE_PRIVATE);
+//        myNickname = settingPrefs.getString("nickname", "我");
+//
+//        // 判斷是否是當前使用者，用 email 比對，改為暱稱
+//        SharedPreferences loginPrefs = getSharedPreferences("login", MODE_PRIVATE);
+//        myEmail = loginPrefs.getString("userid", ""); // 這是目前登入者的 email
 
         // 從 FireBase 抓取群組人員資料
         intent = getIntent();
         String groupName = intent.getStringExtra("groupName");
-
+        Log.d("mine3",  groupName);
         SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
         String userId = prefs.getString("userid", "0");
 
@@ -167,11 +196,12 @@ public class GroupChargeEdit extends AppCompatActivity {
         db.collection("users")
                 .document(userId)
                 .collection("group")
-                .document(groupName)
+                .document(groupId)
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
                     if (documentSnapshot.exists()) {
                         List<String> memberEmails = (List<String>) documentSnapshot.get("members");
+
                         if (memberEmails != null && !memberEmails.isEmpty()) {
                             members.clear();
                             for (String email : memberEmails) {
@@ -184,7 +214,23 @@ public class GroupChargeEdit extends AppCompatActivity {
                                             members.add(new Member(email, nickname));
 
                                             if (members.size() == memberEmails.size()) {
-                                                setupMembers(); // 所有 nickname 都取得後再顯示 UI
+                                                for (Member emai : members) {
+                                                    String displayName;
+                                                    if (emai.getEmail().equals(emai.getNickname())) {
+                                                        displayName = emai.getEmail();
+                                                    } else {
+                                                        displayName = emai.getNickname();
+                                                    }
+
+                                                    CheckBox cb = new CheckBox(this);
+                                                    cb.setText(displayName);
+                                                    cb.setChecked(originalParticipants != null && originalParticipants.contains(email));
+                                                    memberSelectionContainer.addView(cb);
+
+                                                }
+                                                isMembersLoaded = true;
+
+                                                //setupMembers(); // 所有 nickname 都取得後再顯示 UI
                                             }
                                         });
                             }
@@ -199,10 +245,14 @@ public class GroupChargeEdit extends AppCompatActivity {
 
         // 點選「選擇付款人」 → 顯示多選清單
         tvSelectPayers.setOnClickListener(v -> {
-            if (members.isEmpty()) {
+            if (!isMembersLoaded) {
                 Toast.makeText(this, "尚未載入群組成員", Toast.LENGTH_SHORT).show();
                 return;
             }
+            //            if (members.isEmpty()) {
+//                Toast.makeText(this, "尚未載入群組成員", Toast.LENGTH_SHORT).show();
+//                return;
+//            }
             String[] names = new String[members.size()];
             for (int i = 0; i < members.size(); i++) {
                 names[i] = members.get(i).getNickname();
@@ -240,7 +290,7 @@ public class GroupChargeEdit extends AppCompatActivity {
                         db.collection("users")
                                 .document(userId)
                                 .collection("group")
-                                .document(groupName)
+                                .document(groupId)
                                 .collection("records")
                                 .document(recordId)
                                 .delete()
@@ -351,14 +401,27 @@ public class GroupChargeEdit extends AppCompatActivity {
         }
 
         List<String> selectedEmails = new ArrayList<>();
+//        for (int i = 0; i < memberSelectionContainer.getChildCount(); i++) {
+//            CheckBox cb = (CheckBox) memberSelectionContainer.getChildAt(i);
+//            if (cb.isChecked()) {
+//                String nickname = cb.getText().toString();
+//                String email = nicknameToEmail.get(nickname);
+//                selectedEmails.add(email);
+//            }
+//        }
         for (int i = 0; i < memberSelectionContainer.getChildCount(); i++) {
             CheckBox cb = (CheckBox) memberSelectionContainer.getChildAt(i);
             if (cb.isChecked()) {
                 String nickname = cb.getText().toString();
-                String email = nicknameToEmail.get(nickname);
-                selectedEmails.add(email);
+                for (Member member : members) {
+                    if (nickname.equals(member.getNickname())) {
+                        selectedEmails.add(member.getEmail());
+                        break; // 找到後就跳出內層迴圈
+                    }
+                }
             }
         }
+
 
         // 彈出結果對話框，並回傳資料到 GroupDetail（record 與 summary）
         new AlertDialog.Builder(this)
@@ -367,7 +430,6 @@ public class GroupChargeEdit extends AppCompatActivity {
                 .setPositiveButton("確認", (dialog, which) -> {
                     Intent intent = getIntent();
                     String recordId = intent.getStringExtra("recordId");
-                    String groupName = intent.getStringExtra("groupName");
 
                     SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
                     String userId = prefs.getString("userid", "0");
@@ -375,18 +437,21 @@ public class GroupChargeEdit extends AppCompatActivity {
                     FirebaseFirestore db = FirebaseFirestore.getInstance();
 
                     Map<String, Object> updatedRecord = new HashMap<>();
-                    updatedRecord.put("note", note);
-                    updatedRecord.put("amount", totalAmount);
-                    updatedRecord.put("date", dateText);
+                    updatedRecord.put("content", note);
                     updatedRecord.put("summary", result.toString());
-                    updatedRecord.put("payers", new ArrayList<>(actualPayments.keySet()));
-                    updatedRecord.put("payerAmounts", new ArrayList<>(actualPayments.values()));
-                    updatedRecord.put("participants", selectedEmails);
+                    updatedRecord.put("date", dateText);
+                    updatedRecord.put("note", note);
+                    updatedRecord.put("balance", note);
+//
+//                    updatedRecord.put("amount", totalAmount);
+//                    updatedRecord.put("payers", new ArrayList<>(actualPayments.keySet()));
+//                    updatedRecord.put("payerAmounts", new ArrayList<>(actualPayments.values()));
+//                    updatedRecord.put("participants", selectedEmails);
 
                     db.collection("users")
                             .document(userId)
                             .collection("group")
-                            .document(groupName)
+                            .document(groupId)
                             .collection("records")
                             .document(recordId)
                             .update(updatedRecord)
@@ -400,6 +465,7 @@ public class GroupChargeEdit extends AppCompatActivity {
                             })
                             .addOnFailureListener(e -> {
                                 Toast.makeText(this, "修改失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                Log.e("asd",e.getMessage());
                             });
                 })
                 .show();
@@ -464,69 +530,58 @@ public class GroupChargeEdit extends AppCompatActivity {
 
     // 動態載入人員
     // 動態載入人員
-    private void setupMembers() {
-        SharedPreferences pref = getSharedPreferences("prefs", MODE_PRIVATE);
-        myEmail = pref.getString("email", "");
-        myNickname = pref.getString("nickname", "");
-
-        FirebaseFirestore db = FirebaseFirestore.getInstance();
-
-        db.collection("groups").document(groupId)
-                .collection("members")
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    members.clear();
-                    nicknameToEmail.clear();
-                    emailToNickname.clear();
-
-                    // 初始化 selectedPayers 這邊才安全
-                    selectedPayers = new boolean[queryDocumentSnapshots.size()];
-
-                    Map<String, Double> originalPaymentMap = new HashMap<>();
-                    if (originalPayers != null && payerAmounts != null) {
-                        for (int i = 0; i < originalPayers.size(); i++) {
-                            originalPaymentMap.put(originalPayers.get(i), payerAmounts.get(i));
-                        }
-                    }
-
-                    int i = 0;
-                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                        String email = doc.getString("email");
-                        String nickname = doc.getString("nickname");
-                        Member m = new Member(email, nickname);
-                        members.add(m);
-                        nicknameToEmail.put(nickname, email);
-                        emailToNickname.put(email, nickname);
-
-                        // 建立 checkbox
-                        String displayName = email.equals(myEmail) ? myNickname : nickname;
-                        CheckBox cb = new CheckBox(this);
-                        cb.setText(displayName);
-                        cb.setChecked(originalParticipants != null && originalParticipants.contains(email));
-                        memberSelectionContainer.addView(cb);
-
-                        // 加入已選付款人
-                        if (originalPayers.contains(email)) {
-                            chosenPayers.add(m);
-                            selectedPayers[i] = true;
-                        }
-
-                        i++;
-                    }
-
-                    updatePayerInputFields();
-
-                    for (Map.Entry<String, EditText> entry : payerInputs.entrySet()) {
-                        String nickname = entry.getKey();
-                        EditText input = entry.getValue();
-
-                        String email = nicknameToEmail.get(nickname);
-                        if (email != null) {
-                            Double amt = originalPaymentMap.get(email);
-                            if (amt != null) input.setText(String.valueOf(amt));
-                        }
-                    }
-
-                });
-    }
+//    private void setupMembers() {
+////        SharedPreferences pref = getSharedPreferences("prefs", MODE_PRIVATE);
+////        myEmail = pref.getString("email", "");
+////        myNickname = pref.getString("nickname", "");
+//        myNickname
+//
+//
+//                    Map<String, Double> originalPaymentMap = new HashMap<>();
+//                    if (originalPayers != null && payerAmounts != null) {
+//                        for (int i = 0; i < originalPayers.size(); i++) {
+//                            originalPaymentMap.put(originalPayers.get(i), payerAmounts.get(i));
+//                        }
+//                    }
+//
+//                    int i = 0;
+//                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+//                        String email = doc.getString("email");
+//                        String nickname = doc.getString("nickname");
+//                        Member m = new Member(email, nickname);
+//                        members.add(m);
+//                        nicknameToEmail.put(nickname, email);
+//                        emailToNickname.put(email, nickname);
+//
+//                        // 建立 checkbox
+//                        String displayName = email.equals(myEmail) ? myNickname : nickname;
+//                        CheckBox cb = new CheckBox(this);
+//                        cb.setText(displayName);
+//                        cb.setChecked(originalParticipants != null && originalParticipants.contains(email));
+//                        memberSelectionContainer.addView(cb);
+//
+//                        // 加入已選付款人
+//                        if (originalPayers.contains(email)) {
+//                            chosenPayers.add(m);
+//                            selectedPayers[i] = true;
+//                        }
+//
+//                        i++;
+//                    }
+//
+//                    updatePayerInputFields();
+//
+//                    for (Map.Entry<String, EditText> entry : payerInputs.entrySet()) {
+//                        String nickname = entry.getKey();
+//                        EditText input = entry.getValue();
+//
+//                        String email = nicknameToEmail.get(nickname);
+//                        if (email != null) {
+//                            Double amt = originalPaymentMap.get(email);
+//                            if (amt != null) input.setText(String.valueOf(amt));
+//                        }
+//                    }
+//
+//
+//    }
 }
