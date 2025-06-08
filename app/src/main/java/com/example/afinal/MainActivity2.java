@@ -17,6 +17,7 @@ public class MainActivity2 extends AppCompatActivity {
     private ImageButton imb;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        String userId = getIntent().getStringExtra("userId");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main2);
 

@@ -15,6 +15,8 @@ import android.widget.NumberPicker;
 import android.widget.TextView;
 import android.Manifest;
 import android.content.pm.PackageManager;
+
+import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 
 import androidx.activity.EdgeToEdge;
@@ -43,16 +45,25 @@ import com.google.android.libraries.places.widget.model.AutocompleteActivityMode
 import com.google.android.libraries.places.api.net.PlacesClient;
 import com.google.android.libraries.places.widget.listener.PlaceSelectionListener;
 import com.google.android.gms.common.api.Status;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -63,6 +74,7 @@ import java.util.UUID;
 
 public class Charge extends AppCompatActivity {
     private static final int MAX_LEN = 20;
+    private String userId = "0";
     private static final int REQUEST_CODE_PICK_IMAGE = 1001;
 
     private TextView tvAmountDisplay, tvNote, tvDateDisplay;
@@ -73,11 +85,17 @@ public class Charge extends AppCompatActivity {
     private int uploadedImageCount = 0;
     private final List<Uri> uploadedImageUris = new ArrayList<>();
 
-    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_charge);
+
+        SharedPreferences loginPrefs = getSharedPreferences("login", MODE_PRIVATE);
+        userId = loginPrefs.getString("userid", "0");
+        if (!userId.equals("0")) {
+            syncLocalRecordsIfLoggedIn(userId);
+        }
+
 
         Intent i = getIntent();
         boolean isEdit = i.getBooleanExtra("edit", false);
@@ -158,10 +176,13 @@ public class Charge extends AppCompatActivity {
 
         btnImageUpload = findViewById(R.id.image);
         btnImageUpload.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.setType("image/*");
             intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivityForResult(Intent.createChooser(intent, "選擇圖片"), REQUEST_CODE_PICK_IMAGE);
+
         });
 
         int[] ids = {
@@ -203,24 +224,39 @@ public class Charge extends AppCompatActivity {
             autoEvaluateIfNeeded();
 
             EditText etLocate = findViewById(R.id.locate);
-            String location = etLocate.getText().toString();
+            final String location = etLocate.getText().toString();
+            String priceRaw = tvAmountDisplay.getText().toString().replaceAll("[^\\d.]", "");
+            final String price = priceRaw.replaceFirst("^0+(?!$)", "");
 
-            String price = tvAmountDisplay.getText().toString().replaceAll("[^\\d.]", "");
-            price = price.replaceFirst("^0+(?!$)", "");
+            List<String> imageUriStrings = new ArrayList<>();
+            for (Uri uri : uploadedImageUris) {
+                imageUriStrings.add(uri.toString());
+            }
 
-            Intent result = new Intent();
-            result.putExtra("iconRes", selectedIconRes);
-            result.putExtra("categoryName", selectedCategoryName);
-            result.putExtra("price", tvAmountDisplay.getText().toString());
-            result.putExtra("note", tvNote.getText().toString());
-            result.putExtra("date", tvDateDisplay.getText().toString());
-            result.putExtra("location", location);
-            result.putExtra("imageCount", uploadedImageCount);
-            result.putExtra("edit", isEdit);
-            result.putExtra("position", position);
-            setResult(RESULT_OK, result);
-            finish();
+            LocalRecord record = new LocalRecord();
+            record.amount = price;
+            record.note = tvNote.getText().toString();
+            record.categoryName = selectedCategoryName;
+            record.iconRes = selectedIconRes;
+            record.location = location;
+            record.date = tvDateDisplay.getText().toString();
+            record.imageUris = imageUriStrings;
+
+            SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
+            String userId = prefs.getString("userid", "0");
+
+            if (userId.equals("0")) {
+                // ❌ 未登入，先暫存於本地
+                saveLocally(record);
+            } else {
+                // ✅ 已登入，直接上傳至 Firestore
+                uploadToFirebase(record, userId);
+            }
+
+            sendBackResult(imageUriStrings, location, price);
         });
+
+
     }
 
     private void autoEvaluateIfNeeded() {
@@ -230,6 +266,23 @@ public class Charge extends AppCompatActivity {
         }
     }
 
+    private void sendBackResult(List<String> imageUrls, String location, String price) {
+        Intent result = new Intent();
+        result.putExtra("iconRes", selectedIconRes);
+        result.putExtra("categoryName", selectedCategoryName);
+        result.putExtra("price", "NT$" + price);
+        result.putExtra("note", tvNote.getText().toString());
+        result.putExtra("date", tvDateDisplay.getText().toString());
+        result.putExtra("location", location);
+        result.putExtra("imageCount", imageUrls.size());
+        result.putStringArrayListExtra("imageUrls", new ArrayList<>(imageUrls));
+        result.putExtra("edit", getIntent().getBooleanExtra("edit", false));
+        result.putExtra("position", getIntent().getIntExtra("position", -1));
+        setResult(RESULT_OK, result);
+        finish();
+    }
+
+
     private void saveLocally(LocalRecord record) {
         SharedPreferences prefs = getSharedPreferences("local_records", MODE_PRIVATE);
         Gson gson = new Gson();
@@ -238,6 +291,7 @@ public class Charge extends AppCompatActivity {
         records.add(record);
         prefs.edit().putString("records", gson.toJson(records)).apply();
     }
+
 
     private void uploadToFirebase(LocalRecord record, String userId) {
         FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -256,24 +310,6 @@ public class Charge extends AppCompatActivity {
                 .addOnFailureListener(e -> Log.e("Upload", "失敗: " + e.getMessage()));
     }
 
-    private void uploadImages(List<Uri> uris, OnImagesUploaded callback) {
-        List<String> urls = new ArrayList<>();
-        FirebaseStorage storage = FirebaseStorage.getInstance();
-        StorageReference ref = storage.getReference().child("images");
-
-        for (int i = 0; i < uris.size(); i++) {
-            Uri uri = uris.get(i);
-            StorageReference imageRef = ref.child(UUID.randomUUID().toString());
-            imageRef.putFile(uri).continueWithTask(task -> imageRef.getDownloadUrl())
-                    .addOnCompleteListener(task -> {
-                        if (task.isSuccessful()) {
-                            urls.add(task.getResult().toString());
-                            if (urls.size() == uris.size()) callback.onDone(urls);
-                        }
-                    });
-        }
-    }
-
     interface OnImagesUploaded {
         void onDone(List<String> downloadUrls);
     }
@@ -281,16 +317,10 @@ public class Charge extends AppCompatActivity {
     private void syncLocalRecordsIfLoggedIn(String userId) {
         SharedPreferences prefs = getSharedPreferences("local_records", MODE_PRIVATE);
         String json = prefs.getString("records", "[]");
-        List<LocalRecord> records = new Gson().fromJson(json, new TypeToken<List<LocalRecord>>(){}.getType());
 
+        List<LocalRecord> records = new Gson().fromJson(json, new TypeToken<List<LocalRecord>>() {}.getType());
         for (LocalRecord record : records) {
-            List<Uri> uriList = new ArrayList<>();
-            for (String s : record.imageUris) uriList.add(Uri.parse(s));
-
-            uploadImages(uriList, downloadUrls -> {
-                record.imageUris = downloadUrls;
-                uploadToFirebase(record, userId);
-            });
+            uploadToFirebase(record, userId);
         }
 
         prefs.edit().remove("records").apply();
@@ -362,11 +392,12 @@ public class Charge extends AppCompatActivity {
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == REQUEST_CODE_PICK_IMAGE && resultCode == RESULT_OK && data != null) {
             uploadedImageUris.clear();
+
             if (data.getClipData() != null) {
                 int count = data.getClipData().getItemCount();
                 for (int i = 0; i < count; i++) {
@@ -374,23 +405,20 @@ public class Charge extends AppCompatActivity {
                     uploadedImageUris.add(uri);
                 }
             } else if (data.getData() != null) {
-                uploadedImageUris.add(data.getData());
+                Uri uri = data.getData();
+                uploadedImageUris.add(uri);
             }
-            uploadedImageCount = uploadedImageUris.size();
-            btnImageUpload.setText("圖 (" + uploadedImageCount + ")");
-        }
 
-        if (requestCode == 2000) {
-            if (resultCode == RESULT_OK && data != null) {
-                Place place = Autocomplete.getPlaceFromIntent(data);
-                EditText etLocate = findViewById(R.id.locate);
-                etLocate.setText(place.getName());
-            } else if (resultCode == AutocompleteActivity.RESULT_ERROR && data != null) {
-                Status status = Autocomplete.getStatusFromIntent(data);
-                Log.e("PlaceError", status.getStatusMessage());
+            for (Uri uri : uploadedImageUris) {
+                final int takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+                getContentResolver().takePersistableUriPermission(uri, takeFlags);
             }
         }
     }
+
+
+
+
 
     private void onDigitClick(View v) {
         if (amountBuilder.length() >= MAX_LEN) return;

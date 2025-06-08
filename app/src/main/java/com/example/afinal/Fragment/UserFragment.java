@@ -88,6 +88,7 @@
                     i.putExtra("categoryName", record.getCategoryName());
                     i.putExtra("location", record.getLocation());
                     i.putExtra("position", position);
+                    i.putExtra("userId", getUserId());
                     startActivityForResult(i, REQ_CHARGE);
                 }
 
@@ -115,10 +116,17 @@
             FloatingActionButton fab = view.findViewById(R.id.fabAdd);
             fab.setOnClickListener(v -> {
                 Intent i = new Intent(requireContext(), Charge.class);
+                i.putExtra("userId", getUserId());
                 startActivityForResult(i, REQ_CHARGE);
             });
 
+
             loadRecords();
+        }
+
+        private String getUserId() {
+            SharedPreferences prefs = requireContext().getSharedPreferences("login", Context.MODE_PRIVATE);
+            return prefs.getString("userid", "0");
         }
 
         private void showMonthPickerDialog() {

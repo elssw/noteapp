@@ -65,7 +65,9 @@ public class SignInActivity extends AppCompatActivity {
                                     editor.putString("userid", uid);
                                     editor.apply();
                                     // 跳轉至主畫面
-                                    startActivity(new Intent(SignInActivity.this, MainActivity2.class));
+                                    Intent intent = new Intent(SignInActivity.this, MainActivity2.class);
+                                    intent.putExtra("userId", uid);
+                                    startActivity(intent);
                                     finish();
                                 } else {
                                     Toast.makeText(SignInActivity.this, "登入失敗：" + task.getException().getMessage(), Toast.LENGTH_LONG).show();
