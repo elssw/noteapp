@@ -343,6 +343,8 @@
                 String price = data.getStringExtra("price");
                 String note = data.getStringExtra("note");
                 String date = data.getStringExtra("date");
+//                List<String> imageUrls=data.getStringArrayListExtra("imageUrls");
+//                String placeId=data.getStringExtra("placeId");
                 String location = data.getStringExtra("location");
                 boolean isEdit = data.getBooleanExtra("edit", false);
                 int position = data.getIntExtra("position", -1);
