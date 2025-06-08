@@ -7,6 +7,7 @@
     android:background="#FFFFFF">
 
     <!-- 功能選項區塊 -->
+
     <TextView
         android:id="@+id/tv_account_clear_personal"
         android:layout_width="0dp"
@@ -16,49 +17,9 @@
         android:text="清除所有個人記帳紀錄"
         android:textColor="#000000"
         android:textSize="20sp"
-        app:layout_constraintBottom_toTopOf="@+id/tv_classification"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/tv_classification" />
-
-    <TextView
-        android:id="@+id/tv_classification"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:background="@drawable/textview_border"
-        android:padding="16dp"
-        android:text="清除所有群組記帳紀錄"
-        android:textAlignment="textStart"
-        android:textColor="#000000"
-        android:textSize="20sp"
-        app:layout_constraintBottom_toTopOf="@+id/tv_clear_group"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/tv_clear_group" />
-
-    <TextView
-        android:id="@+id/tv_clear_group"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:background="@drawable/textview_border"
-        android:padding="16dp"
-        android:text="清除所有群組"
-        android:textColor="#000000"
-        android:textSize="20sp"
-        app:layout_constraintBottom_toTopOf="@+id/tv_clear_selfdifine"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/tv_clear_selfdifine" />
-
-    <TextView
-        android:id="@+id/tv_clear_selfdifine"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:background="@drawable/textview_border"
-        android:padding="16dp"
-        android:text="清除所有自定義分類項目"
-        android:textColor="#000000"
-        android:textSize="20sp"
         app:layout_constraintBottom_toTopOf="@+id/tv_delete_account"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/tv_delete_account" />
+        app:layout_constraintStart_toStartOf="parent" />
 
     <TextView
         android:id="@+id/tv_delete_account"

@@ -1,5 +1,6 @@
 package com.example.afinal;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -52,6 +53,10 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -167,7 +172,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
-
+        mMap.getUiSettings().setMyLocationButtonEnabled(false);
         mMap.setOnPoiClickListener(new GoogleMap.OnPoiClickListener() {
             @Override
             public void onPoiClick(PointOfInterest poi) {
@@ -185,7 +190,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
                 BottomSheetBehavior<LinearLayout> bottomSheetBehavior = BottomSheetBehavior.from(findViewById(R.id.bottom_sheet));
                 bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-                mMap.getUiSettings().setMyLocationButtonEnabled(false);
+//                mMap.getUiSettings().setMyLocationButtonEnabled(true);
 
                 SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
                 String userid = prefs.getString("userid", "0");
@@ -197,22 +202,64 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 imageUris.clear();
                 adapter.notifyDataSetChanged();  // 通知 RecyclerView 整體更新
                 Comment.setText("");
-                DocumentReference placeRef = db.collection("users").document(userid)
-                        .collection("map").document(placeId);
+                if(userid.equals("0")){
+                    // ===== 讀取本地暫存評論 =====
+                    String commentFilename = "comment_" + placeId + ".txt";
+                    try {
+                        FileInputStream fis = openFileInput(commentFilename);
+                        byte[] buffer = new byte[fis.available()];
+                        fis.read(buffer);
+                        fis.close();
+                        String savedComment = new String(buffer);
+                        Comment.setText(savedComment);  // 顯示到 UI
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        Toast.makeText(MainActivity.this, "無本地暫存評論", Toast.LENGTH_SHORT).show();
 
-                placeRef.get().addOnSuccessListener(snapshot -> {
-                    if (snapshot.exists()) {
-                        Comment.setText((String) snapshot.get("comment"));
-                        List<String> imageUrls = (List<String>) snapshot.get("images");  // 讀取 images 陣列
-                        if (imageUrls != null) {
-                            for (String url : imageUrls) {
-                                imageUris.add(Uri.parse(url));  // 轉成 Uri 並加入
+                    }
+
+                    // ===== 讀取本地暫存圖片 URI =====
+                    String imageFilename = "images_" + placeId + ".txt";
+                    try {
+                        FileInputStream fis = openFileInput(imageFilename);
+                        byte[] buffer = new byte[fis.available()];
+                        fis.read(buffer);
+                        fis.close();
+                        String savedUris = new String(buffer);  // 字串格式：uri1,uri2,...
+
+                        if (!savedUris.isEmpty()) {
+                            String[] uriArray = savedUris.split(",");
+                            for (String uriStr : uriArray) {
+                                imageUris.add(Uri.parse(uriStr));
                             }
-
-                            // ✅ 通知 RecyclerView 更新
                             adapter.notifyItemInserted(imageUris.size() - 1);
                         }
-                    }});
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        Toast.makeText(MainActivity.this, "無本地暫存圖片", Toast.LENGTH_SHORT).show();
+
+                    }
+
+                }
+                else {
+                    DocumentReference placeRef = db.collection("users").document(userid)
+                            .collection("map").document(placeId);
+
+                    placeRef.get().addOnSuccessListener(snapshot -> {
+                        if (snapshot.exists()) {
+                            Comment.setText((String) snapshot.get("comment"));
+                            List<String> imageUrls = (List<String>) snapshot.get("images");  // 讀取 images 陣列
+                            if (imageUrls != null) {
+                                for (String url : imageUrls) {
+                                    imageUris.add(Uri.parse(url));  // 轉成 Uri 並加入
+                                }
+
+                                // ✅ 通知 RecyclerView 更新
+                                adapter.notifyItemInserted(imageUris.size() - 1);
+                            }
+                        }
+                    });
+                }
             }
         });
         // **設定地圖樣式**
@@ -250,8 +297,19 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
         String userid = prefs.getString("userid", "0");
 
-        if(userid.equals(0)){
+        if(userid.equals("0")){
+            String filename = "comment_" + placeId + ".txt";
+            String fileContents = comments;
 
+            try {
+                FileOutputStream fos = openFileOutput(filename, Context.MODE_PRIVATE);
+                fos.write(fileContents.getBytes());
+                fos.close();
+                Toast.makeText(this, "尚未登入，評論已暫存到檔案", Toast.LENGTH_SHORT).show();
+            } catch (IOException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "評論暫存失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+            }
 
         }
         else{
@@ -297,8 +355,34 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             getContentResolver().takePersistableUriPermission(imageUri, takeFlags);
 
             if (imageUri != null) {
-                if(userid.equals(0)){
+                if(userid.equals("0")){
+                    String filename = "images_" + placeId + ".txt";
+                    String newImageUri = imageUri.toString();
 
+                    try {
+                        // 讀舊資料並追加
+                        String existing = "";
+                        try (FileInputStream fis = openFileInput(filename)) {
+                            byte[] buffer = new byte[fis.available()];
+                            fis.read(buffer);
+                            existing = new String(buffer);
+                        } catch (FileNotFoundException ignored) {
+                            // 檔案第一次建立，不需處理
+                        }
+
+                        String updated = existing.isEmpty() ? newImageUri : existing + "," + newImageUri;
+
+                        FileOutputStream fos = openFileOutput(filename, Context.MODE_PRIVATE);
+                        fos.write(updated.getBytes());
+                        fos.close();
+
+                        imageUris.add(imageUri);
+                        adapter.notifyItemInserted(imageUris.size() - 1);
+                        Toast.makeText(this, "尚未登入，圖片 URI 已暫存到檔案", Toast.LENGTH_SHORT).show();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "圖片 URI 暫存失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
 
                 }
                 else{

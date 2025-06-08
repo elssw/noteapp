@@ -77,46 +77,38 @@
         app:layout_constraintTop_toTopOf="@+id/tv_nickname" />
 
     <!-- Reminder -->
-    <TextView
-        android:id="@+id/tv_reminder_state"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:textColor="#000000"
-        android:textSize="20sp"
-        android:hint="提醒時間："
-        app:layout_constraintBottom_toTopOf="@+id/tv_account_switch"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tv_nickname" />
+<!--    <TextView-->
+<!--        android:id="@+id/tv_reminder_state"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:padding="16dp"-->
+<!--        android:textColor="#000000"-->
+<!--        android:textSize="20sp"-->
+<!--        android:hint="提醒時間："-->
+<!--        app:layout_constraintBottom_toTopOf="@+id/tv_account_switch"-->
+<!--        app:layout_constraintEnd_toEndOf="parent"-->
+<!--        app:layout_constraintStart_toStartOf="parent"-->
+<!--        app:layout_constraintTop_toBottomOf="@+id/tv_nickname" />-->
 
     <!-- 功能選項區塊 -->
+
+
     <TextView
         android:id="@+id/tv_account_switch"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
         android:background="@drawable/textview_border"
         android:padding="16dp"
         android:text="帳號切換"
         android:textColor="#000000"
         android:textSize="20sp"
-        app:layout_constraintBottom_toTopOf="@+id/tv_classification"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/tv_classification" />
-
-    <TextView
-        android:id="@+id/tv_classification"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:background="@drawable/textview_border"
-        android:padding="16dp"
-        android:text="分類管理"
-        android:textAlignment="textStart"
-        android:textColor="#000000"
-        android:textSize="20sp"
         app:layout_constraintBottom_toTopOf="@+id/tv_accounting_reminder"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@+id/tv_accounting_reminder" />
+        app:layout_constraintHorizontal_bias="0.0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_nickname"
+        app:layout_constraintVertical_bias="1.0" />
 
     <TextView
         android:id="@+id/tv_accounting_reminder"

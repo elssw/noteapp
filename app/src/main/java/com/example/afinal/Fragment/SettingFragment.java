@@ -190,7 +190,17 @@ public class SettingFragment extends Fragment {
         tvAccountSwitch.setOnClickListener(v-> {
             accountSwitch();
         });
+        reset.setOnClickListener(v -> {
+            SettingResetFragment re= new SettingResetFragment ();
 
+            // 替換目前 Fragment 為提醒設定頁面
+            requireActivity().getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragment_main, re) // R.id.fragment_container 替換成實際 MainActivity的 FrameLayout ID
+                    .addToBackStack(null) // 加入返回堆疊
+                    .commit();
+
+        });
 
         // 記帳提醒
         tvReminderAccounting.setOnClickListener(v -> {
