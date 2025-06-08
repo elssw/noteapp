@@ -477,7 +477,7 @@ public class GroupFragment extends Fragment {
             }
             setArguments(null); // 避免重複新增
         }
-        loadGroupsFromFirestore();
+//        loadGroupsFromFirestore();
 //        refreshGroupItems();
     }
 
@@ -542,4 +542,11 @@ public class GroupFragment extends Fragment {
 
         }
     }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        loadGroupsFromFirestore();  // 重新建立 GroupFragment 後就自動刷新
+    }
+
 }

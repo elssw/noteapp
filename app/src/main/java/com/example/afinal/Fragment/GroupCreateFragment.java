@@ -305,17 +305,17 @@ public class GroupCreateFragment extends Fragment {
 
                             Toast.makeText(getContext(), "群組建立成功", Toast.LENGTH_SHORT).show();
                         }
+                        Fragment groupFragment = new GroupFragment();
+                        requireActivity().getSupportFragmentManager()
+                                .beginTransaction()
+                                .replace(R.id.fragment_main, groupFragment)
+                                .commit();
                     })
                     .addOnFailureListener(e -> {
                         Log.e("Firestore", "檢查群組名稱時錯誤：" + e.getMessage());
                         Toast.makeText(getContext(), "檢查群組時發生錯誤", Toast.LENGTH_SHORT).show();
                     });
-            Fragment groupFragment = new GroupFragment();
 
-            requireActivity().getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.fragment_main, groupFragment)
-                    .commit();
         });
         updateInvitedList();
 
