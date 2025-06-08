@@ -98,7 +98,6 @@ public class GroupChargeEdit extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_group_charge_edit);
 
-        // 綁定 UI 元件
         imgPreview = findViewById(R.id.imgPreview);
         etAmount = findViewById(R.id.etAmount);
         etNote = findViewById(R.id.etNote);
@@ -109,176 +108,78 @@ public class GroupChargeEdit extends AppCompatActivity {
 
         Intent intent = getIntent();
         groupId = intent.getStringExtra("groupId");
-
-        if (groupId == null || groupId.isEmpty()) {
-            Toast.makeText(this, "無法取得群組 ID，請重新進入", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        // 接收原本的紀錄資料並填入 UI
         String recordId = intent.getStringExtra("recordId");
-        String original = intent.getStringExtra("content");
-        // 移除 NT$，並用空白分割
-        String[] parts = original.replace("NT$", "").split("\\s+", 2);
 
-        String originalAmount = parts[0];  // "220"
-        String originalNote = parts.length > 1 ? parts[1] : "";  // "阿阿"（若無則給空字串）
+        SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
+        String userId = prefs.getString("userid", "0");
 
-        String originalDate = intent.getStringExtra("date");
-        originalPayers = intent.getStringArrayListExtra("payers");
-        payerAmounts = (ArrayList<Double>) intent.getSerializableExtra("payerAmounts");
-        originalParticipants = intent.getStringArrayListExtra("participants");
-        Log.d("RecordDebug", "recordId: " + recordId);
-        Log.d("RecordDebug", "originalNote: " + originalNote);
-        Log.d("RecordDebug", "originalAmount: " + originalAmount);
-        Log.d("RecordDebug", "originalDate: " + originalDate);
-        if (originalPayers != null) {
-            for (String payer : originalPayers) {
-                Log.d("RecordDebug", "Payer: " + payer);
-            }
-        }
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
 
-        if (payerAmounts != null) {
-            for (Double amt : payerAmounts) {
-                Log.d("RecordDebug", "Payer Amount: " + amt);
-            }
-        }
+        // 🔹 1. 先讀取該筆紀錄（amount, note, date, payers, payerAmounts, participants）
+        db.collection("users")
+                .document(userId)
+                .collection("group")
+                .document(groupId)
+                .collection("records")
+                .document(recordId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        double amount = documentSnapshot.getDouble("amount");
+                        String note = documentSnapshot.getString("note");
+                        String date = documentSnapshot.getString("date");
 
-        if (originalParticipants != null) {
-            for (String participant : originalParticipants) {
-                Log.d("RecordDebug", "Participant: " + participant);
-            }
-        }
-//        Log.d("RecordDebug", "originalPayers: " + originalPayers);
-//        Log.d("RecordDebug", "payerAmounts: " + payerAmounts);
-//        Log.d("RecordDebug", "originalParticipants: " + originalParticipants);
+                        originalPayers = (ArrayList<String>) documentSnapshot.get("payers");
+                        payerAmounts = (ArrayList<Double>) documentSnapshot.get("payerAmounts");
+                        originalParticipants = (ArrayList<String>) documentSnapshot.get("participants");
 
-        // 先設定基本欄位
-        etNote.setText(originalNote);
-        etAmount.setText(String.valueOf(originalAmount));
-        tvDate.setText(originalDate);
+                        etAmount.setText(String.valueOf((int) amount));
+                        etNote.setText(note);
+                        tvDate.setText(date);
 
-        // 返回鍵
+                        // 🔹 2. 載入成員後再還原畫面
+                        db.collection("users")
+                                .document(userId)
+                                .collection("group")
+                                .document(groupId)
+                                .get()
+                                .addOnSuccessListener(groupDoc -> {
+                                    List<String> memberEmails = (List<String>) groupDoc.get("members");
+                                    if (memberEmails != null && !memberEmails.isEmpty()) {
+                                        members.clear();
+                                        for (String email : memberEmails) {
+                                            db.collection("users").document(email).get().addOnSuccessListener(userSnap -> {
+                                                String nickname = userSnap.getString("nickname");
+                                                if (nickname == null || nickname.isEmpty()) nickname = email;
+                                                members.add(new Member(email, nickname));
+
+                                                // 成員都抓完後
+                                                if (members.size() == memberEmails.size()) {
+                                                    restoreUI();
+                                                }
+                                            });
+                                        }
+                                    }
+                                });
+                    }
+                });
+
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
-
-        // 點圖片 → 選擇相片或拍照
         imgPreview.setOnClickListener(v -> showImageOptions());
-
-        // 選擇日期 → 使用 DatePickerDialog
         tvDate.setOnClickListener(v -> {
             int year = selectedDate.get(Calendar.YEAR);
             int month = selectedDate.get(Calendar.MONTH);
             int day = selectedDate.get(Calendar.DAY_OF_MONTH);
-
             new DatePickerDialog(this, (view, y, m, d) -> {
                 selectedDate.set(y, m, d);
                 tvDate.setText(String.format(Locale.getDefault(), "%04d-%02d-%02d", y, m + 1, d));
             }, year, month, day).show();
         });
-
-        // 使用者未設置暱稱時，預設“我”
-//        SharedPreferences settingPrefs = getSharedPreferences("setting_prefs", MODE_PRIVATE);
-//        myNickname = settingPrefs.getString("nickname", "我");
-//
-//        // 判斷是否是當前使用者，用 email 比對，改為暱稱
-//        SharedPreferences loginPrefs = getSharedPreferences("login", MODE_PRIVATE);
-//        myEmail = loginPrefs.getString("userid", ""); // 這是目前登入者的 email
-
-        // 從 FireBase 抓取群組人員資料
-        intent = getIntent();
-        String groupName = intent.getStringExtra("groupName");
-        Log.d("mine3",  groupName);
-        SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
-        String userId = prefs.getString("userid", "0");
-
-        FirebaseFirestore db = FirebaseFirestore.getInstance();
-        db.collection("users")
-                .document(userId)
-                .collection("group")
-                .document(groupId)
-                .get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot.exists()) {
-                        List<String> memberEmails = (List<String>) documentSnapshot.get("members");
-
-                        if (memberEmails != null && !memberEmails.isEmpty()) {
-                            members.clear();
-                            for (String email : memberEmails) {
-                                db.collection("users")
-                                        .document(email)
-                                        .get()
-                                        .addOnSuccessListener(userSnap -> {
-                                            String nickname = userSnap.getString("nickname");
-                                            if (nickname == null || nickname.isEmpty()) nickname = email;
-                                            members.add(new Member(email, nickname));
-
-                                            if (members.size() == memberEmails.size()) {
-                                                for (Member emai : members) {
-                                                    String displayName;
-                                                    if (emai.getEmail().equals(emai.getNickname())) {
-                                                        displayName = emai.getEmail();
-                                                    } else {
-                                                        displayName = emai.getNickname();
-                                                    }
-
-                                                    CheckBox cb = new CheckBox(this);
-                                                    cb.setText(displayName);
-                                                    cb.setChecked(originalParticipants != null && originalParticipants.contains(email));
-                                                    memberSelectionContainer.addView(cb);
-
-                                                }
-                                                isMembersLoaded = true;
-
-                                                //setupMembers(); // 所有 nickname 都取得後再顯示 UI
-                                            }
-                                        });
-                            }
-                        }
-                    }
-                })
-                .addOnFailureListener(e -> Log.e("Firestore", "載入群組成員失敗：" + e.getMessage()));
-
-
-        // 預設不顯示付款金額區塊，除非有選付款人
-        payerAmountContainer.setVisibility(View.GONE);
-
-        // 點選「選擇付款人」 → 顯示多選清單
-        tvSelectPayers.setOnClickListener(v -> {
-            if (!isMembersLoaded) {
-                Toast.makeText(this, "尚未載入群組成員", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            //            if (members.isEmpty()) {
-//                Toast.makeText(this, "尚未載入群組成員", Toast.LENGTH_SHORT).show();
-//                return;
-//            }
-            String[] names = new String[members.size()];
-            for (int i = 0; i < members.size(); i++) {
-                names[i] = members.get(i).getNickname();
-            }
-            selectedPayers = new boolean[members.size()];
-
-            new AlertDialog.Builder(this)
-                    .setTitle("選擇付款人")
-                    .setMultiChoiceItems(names, selectedPayers, (dialog, which, isChecked) -> {
-                        Member selected = members.get(which);
-                        if (isChecked) {
-                            if (!chosenPayers.contains(selected)) chosenPayers.add(selected);
-                        } else {
-                            chosenPayers.remove(selected);
-                        }
-                    })
-                    .setPositiveButton("確定", (dialog, which) -> updatePayerInputFields())
-                    .setNegativeButton("取消", null)
-                    .show();
-
-        });
+        tvSelectPayers.setOnClickListener(v -> showPayerSelector());
 
         // 點擊確認後計算分帳邏輯
         findViewById(R.id.btnConfirm).setOnClickListener(v -> calculateSplit());
 
-        // 刪除此筆分帳紀錄
         // 刪除此筆分帳紀錄
         findViewById(R.id.btnDelete).setOnClickListener(v -> {
             new AlertDialog.Builder(this)
@@ -306,9 +207,8 @@ public class GroupChargeEdit extends AppCompatActivity {
                     .setNegativeButton("取消", null)
                     .show();
         });
-
-
     }
+
 
     // 顯示使用者選擇圖片來源（相簿 or 拍照）
     private void showImageOptions() {
@@ -336,7 +236,6 @@ public class GroupChargeEdit extends AppCompatActivity {
         String note = etNote.getText().toString().trim();
         String totalStr = etAmount.getText().toString().trim();
 
-        // 檢查欄位是否空白
         if (note.isEmpty() || totalStr.isEmpty()) {
             Toast.makeText(this, "請輸入金額與備註", Toast.LENGTH_SHORT).show();
             return;
@@ -350,19 +249,27 @@ public class GroupChargeEdit extends AppCompatActivity {
             return;
         }
 
-        // 收集有被勾選的分帳成員
-        List<String> selectedMembers = new ArrayList<>();
+        // 收集有勾選的分帳成員（nickname → email）
+        List<String> selectedEmails = new ArrayList<>();
         for (int i = 0; i < memberSelectionContainer.getChildCount(); i++) {
             CheckBox cb = (CheckBox) memberSelectionContainer.getChildAt(i);
-            if (cb.isChecked()) selectedMembers.add(cb.getText().toString());
+            if (cb.isChecked()) {
+                String nickname = cb.getText().toString();
+                for (Member member : members) {
+                    if (nickname.equals(member.getNickname())) {
+                        selectedEmails.add(member.getEmail());
+                        break;
+                    }
+                }
+            }
         }
 
-        if (selectedMembers.isEmpty()) {
+        if (selectedEmails.isEmpty()) {
             Toast.makeText(this, "請選擇至少一位分帳對象", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // 收集每位付款人實際輸入的付款金額
+        // 收集付款人金額（nickname → 金額）
         Map<String, Double> actualPayments = new HashMap<>();
         for (Member payer : chosenPayers) {
             String nickname = payer.getNickname();
@@ -372,27 +279,47 @@ public class GroupChargeEdit extends AppCompatActivity {
             actualPayments.put(nickname, paid);
         }
 
-        double perPerson = totalAmount / selectedMembers.size();
-
+        double perPerson = totalAmount / selectedEmails.size();
         String dateText = tvDate.getText().toString().trim();
         if (dateText.equals("請選擇日期")) {
             Toast.makeText(this, "請選擇消費日期", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // 結果彙整為文字形式（也可改為 JSON 結構傳給後端）
+        // 建立 email 對應的 balances
+        Set<String> allInvolvedNicknames = new HashSet<>(actualPayments.keySet());
+        for (String email : selectedEmails) {
+            for (Member m : members) {
+                if (email.equals(m.getEmail())) {
+                    allInvolvedNicknames.add(m.getNickname());
+                    break;
+                }
+            }
+        }
+
+        Map<String, Float> balancesToSend = new HashMap<>();
         StringBuilder result = new StringBuilder("消費日期：" + dateText + "\n");
         result.append("備註：「").append(note).append("」\n總金額 NT$").append(totalAmount).append("\n\n");
 
-        // 付款人與參與者合併為所有相關人員
-        Set<String> allInvolved = new LinkedHashSet<>();
-        allInvolved.addAll(selectedMembers);
-        allInvolved.addAll(actualPayments.keySet());
+        for (String nickname : allInvolvedNicknames) {
+            double paid = actualPayments.getOrDefault(nickname, 0.0);
+            double balance = 0;
+            String email = "";
 
-        for (String name : allInvolved) {
-            double paid = actualPayments.getOrDefault(name, 0.0);
-            double balance = selectedMembers.contains(name) ? (paid - perPerson) : paid;
-            result.append(name)
+            for (Member m : members) {
+                if (m.getNickname().equals(nickname)) {
+                    email = m.getEmail();
+                    if (selectedEmails.contains(email)) {
+                        balance = paid - perPerson;
+                    } else {
+                        balance = paid;
+                    }
+                    break;
+                }
+            }
+
+            balancesToSend.put(email, (float) balance);
+            result.append(nickname)
                     .append(" 已付 NT$").append(paid)
                     .append(" → ")
                     .append(balance >= 0 ? "收回" : "應付")
@@ -400,53 +327,38 @@ public class GroupChargeEdit extends AppCompatActivity {
                     .append("\n");
         }
 
-        List<String> selectedEmails = new ArrayList<>();
-//        for (int i = 0; i < memberSelectionContainer.getChildCount(); i++) {
-//            CheckBox cb = (CheckBox) memberSelectionContainer.getChildAt(i);
-//            if (cb.isChecked()) {
-//                String nickname = cb.getText().toString();
-//                String email = nicknameToEmail.get(nickname);
-//                selectedEmails.add(email);
-//            }
-//        }
-        for (int i = 0; i < memberSelectionContainer.getChildCount(); i++) {
-            CheckBox cb = (CheckBox) memberSelectionContainer.getChildAt(i);
-            if (cb.isChecked()) {
-                String nickname = cb.getText().toString();
-                for (Member member : members) {
-                    if (nickname.equals(member.getNickname())) {
-                        selectedEmails.add(member.getEmail());
-                        break; // 找到後就跳出內層迴圈
-                    }
-                }
-            }
-        }
-
-
-        // 彈出結果對話框，並回傳資料到 GroupDetail（record 與 summary）
+        // 彈出確認視窗
         new AlertDialog.Builder(this)
                 .setTitle("分帳結果")
                 .setMessage(result.toString())
                 .setPositiveButton("確認", (dialog, which) -> {
-                    Intent intent = getIntent();
-                    String recordId = intent.getStringExtra("recordId");
-
+                    String recordId = getIntent().getStringExtra("recordId");
                     SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
                     String userId = prefs.getString("userid", "0");
-
                     FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+                    // 付款人資訊（轉為 email）
+                    List<String> payerEmails = new ArrayList<>();
+                    List<Double> payerAmounts = new ArrayList<>();
+                    for (Member payer : chosenPayers) {
+                        String nickname = payer.getNickname();
+                        EditText input = payerInputs.get(nickname);
+                        String value = input.getText().toString().trim();
+                        double amount = value.isEmpty() ? 0.0 : Double.parseDouble(value);
+                        payerEmails.add(payer.getEmail());
+                        payerAmounts.add(amount);
+                    }
 
                     Map<String, Object> updatedRecord = new HashMap<>();
                     updatedRecord.put("content", note);
                     updatedRecord.put("summary", result.toString());
                     updatedRecord.put("date", dateText);
                     updatedRecord.put("note", note);
-                    updatedRecord.put("balance", note);
-//
-//                    updatedRecord.put("amount", totalAmount);
-//                    updatedRecord.put("payers", new ArrayList<>(actualPayments.keySet()));
-//                    updatedRecord.put("payerAmounts", new ArrayList<>(actualPayments.values()));
-//                    updatedRecord.put("participants", selectedEmails);
+                    updatedRecord.put("amount", totalAmount);
+                    updatedRecord.put("payers", payerEmails);
+                    updatedRecord.put("payerAmounts", payerAmounts);
+                    updatedRecord.put("participants", selectedEmails);
+                    updatedRecord.put("balances", balancesToSend);
 
                     db.collection("users")
                             .document(userId)
@@ -465,11 +377,12 @@ public class GroupChargeEdit extends AppCompatActivity {
                             })
                             .addOnFailureListener(e -> {
                                 Toast.makeText(this, "修改失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
-                                Log.e("asd",e.getMessage());
                             });
                 })
+                .setNegativeButton("取消", null)
                 .show();
     }
+
 
     // 處理相機權限結果
     @Override
@@ -528,60 +441,73 @@ public class GroupChargeEdit extends AppCompatActivity {
         }
     }
 
-    // 動態載入人員
-    // 動態載入人員
-//    private void setupMembers() {
-////        SharedPreferences pref = getSharedPreferences("prefs", MODE_PRIVATE);
-////        myEmail = pref.getString("email", "");
-////        myNickname = pref.getString("nickname", "");
-//        myNickname
-//
-//
-//                    Map<String, Double> originalPaymentMap = new HashMap<>();
-//                    if (originalPayers != null && payerAmounts != null) {
-//                        for (int i = 0; i < originalPayers.size(); i++) {
-//                            originalPaymentMap.put(originalPayers.get(i), payerAmounts.get(i));
-//                        }
-//                    }
-//
-//                    int i = 0;
-//                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-//                        String email = doc.getString("email");
-//                        String nickname = doc.getString("nickname");
-//                        Member m = new Member(email, nickname);
-//                        members.add(m);
-//                        nicknameToEmail.put(nickname, email);
-//                        emailToNickname.put(email, nickname);
-//
-//                        // 建立 checkbox
-//                        String displayName = email.equals(myEmail) ? myNickname : nickname;
-//                        CheckBox cb = new CheckBox(this);
-//                        cb.setText(displayName);
-//                        cb.setChecked(originalParticipants != null && originalParticipants.contains(email));
-//                        memberSelectionContainer.addView(cb);
-//
-//                        // 加入已選付款人
-//                        if (originalPayers.contains(email)) {
-//                            chosenPayers.add(m);
-//                            selectedPayers[i] = true;
-//                        }
-//
-//                        i++;
-//                    }
-//
-//                    updatePayerInputFields();
-//
-//                    for (Map.Entry<String, EditText> entry : payerInputs.entrySet()) {
-//                        String nickname = entry.getKey();
-//                        EditText input = entry.getValue();
-//
-//                        String email = nicknameToEmail.get(nickname);
-//                        if (email != null) {
-//                            Double amt = originalPaymentMap.get(email);
-//                            if (amt != null) input.setText(String.valueOf(amt));
-//                        }
-//                    }
-//
-//
-//    }
+    private void restoreUI() {
+        memberSelectionContainer.removeAllViews();
+        chosenPayers.clear();
+        payerInputs.clear();
+
+        // 顯示 checkbox，還原參與者勾選
+        for (Member member : members) {
+            String nickname = member.getNickname();
+            CheckBox cb = new CheckBox(this);
+            cb.setText(nickname);
+            cb.setChecked(originalParticipants != null && originalParticipants.contains(member.getEmail()));
+            memberSelectionContainer.addView(cb);
+        }
+
+        // 還原付款人清單
+        if (originalPayers != null) {
+            for (String payerEmail : originalPayers) {
+                for (Member m : members) {
+                    if (m.getEmail().equals(payerEmail)) {
+                        chosenPayers.add(m);
+                        break;
+                    }
+                }
+            }
+            updatePayerInputFields(); // 建立輸入框
+
+            // 填入付款金額
+            for (int i = 0; i < originalPayers.size(); i++) {
+                String email = originalPayers.get(i);
+                Double amt = payerAmounts.get(i);
+                for (Member m : members) {
+                    if (m.getEmail().equals(email)) {
+                        EditText et = payerInputs.get(m.getNickname());
+                        if (et != null) {
+                            et.setText(String.valueOf(amt));
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    private void showPayerSelector() {
+        if (members.isEmpty()) {
+            Toast.makeText(this, "尚未載入群組成員", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] names = new String[members.size()];
+        selectedPayers = new boolean[members.size()];
+        for (int i = 0; i < members.size(); i++) {
+            names[i] = members.get(i).getNickname();
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("選擇付款人")
+                .setMultiChoiceItems(names, selectedPayers, (dialog, which, isChecked) -> {
+                    Member selected = members.get(which);
+                    if (isChecked) {
+                        if (!chosenPayers.contains(selected)) chosenPayers.add(selected);
+                    } else {
+                        chosenPayers.remove(selected);
+                    }
+                })
+                .setPositiveButton("確定", (dialog, which) -> updatePayerInputFields())
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
 }

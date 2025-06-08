@@ -325,10 +325,7 @@ public class GroupCharge2 extends AppCompatActivity {
                 .setTitle("分帳結果")
                 .setMessage(result.toString())
                 .setPositiveButton("確認", (dialog, which) -> {
-                    String record = String.format("%s - NT$%.0f %s", dateText, totalAmount, note); // eg. 2025-06-04 - 900 晚餐
-                    Intent resultIntent = new Intent();
-
-                    // 將 balance 結果組成 Map<String, Float>
+                    String record = String.format("%s - NT$%.0f %s", dateText, totalAmount, note);
                     Map<String, Float> balancesToSend = new HashMap<>();
 
                     for (String email : allInvolved) {
@@ -345,14 +342,57 @@ public class GroupCharge2 extends AppCompatActivity {
                         balancesToSend.put(email, (float) balance);
                     }
 
-                    // 轉成 JSON 傳出
-                    resultIntent.putExtra("balances", new com.google.gson.Gson().toJson(balancesToSend));
+                    // Firebase 寫入
+                    SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
+                    String userId = prefs.getString("userid", "0");
+                    String groupName = getIntent().getStringExtra("groupName");
 
-                    resultIntent.putExtra("summary", result.toString());
-                    resultIntent.putExtra("record", record);
-                    setResult(RESULT_OK, resultIntent);
-                    finish();
+                    List<String> payerEmails = new ArrayList<>();
+                    List<Double> payerAmounts = new ArrayList<>();
+                    for (Member payer : chosenPayers) {
+                        String email = payer.getEmail();
+                        EditText input = payerInputs.get(email);
+                        String value = input.getText().toString().trim();
+                        double amount = value.isEmpty() ? 0.0 : Double.parseDouble(value);
+                        payerEmails.add(email);
+                        payerAmounts.add(amount);
+                    }
+
+                    Map<String, Object> recordData = new HashMap<>();
+                    recordData.put("content", note);
+                    recordData.put("summary", result.toString());
+                    recordData.put("date", dateText);
+                    recordData.put("note", note);
+                    recordData.put("amount", totalAmount);
+                    recordData.put("payers", payerEmails);
+                    recordData.put("payerAmounts", payerAmounts);
+                    recordData.put("participants", selectedMembers);
+                    recordData.put("balances", balancesToSend);
+                    recordData.put("timestamp", new Date());
+
+                    FirebaseFirestore db = FirebaseFirestore.getInstance();
+                    db.collection("users")
+                            .document(userId)
+                            .collection("group")
+                            .document(groupName)
+                            .collection("records")
+                            .add(recordData)
+                            .addOnSuccessListener(docRef -> {
+                                Toast.makeText(this, "新增成功", Toast.LENGTH_SHORT).show();
+
+                                Intent resultIntent = new Intent();
+                                resultIntent.putExtra("summary", result.toString());
+                                resultIntent.putExtra("record", record);
+                                resultIntent.putExtra("balances", new com.google.gson.Gson().toJson(balancesToSend));
+                                setResult(RESULT_OK, resultIntent);
+                                finish();
+                            })
+                            .addOnFailureListener(e -> {
+                                Toast.makeText(this, "儲存失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                Log.e("Firestore", "新增紀錄失敗", e);
+                            });
                 })
+
                 .show();
     }
 
