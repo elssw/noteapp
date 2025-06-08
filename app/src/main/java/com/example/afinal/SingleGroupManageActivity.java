@@ -31,14 +31,29 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.SetOptions;
+import com.google.gson.Gson;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStreamReader;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class SingleGroupManageActivity extends AppCompatActivity {
 
@@ -52,6 +67,7 @@ public class SingleGroupManageActivity extends AppCompatActivity {
     private Context context;
     private ArrayList<String> invitedUsers = new ArrayList<>();
     private ActivityResultLauncher<Intent> imagePickerLauncher;
+    //private ArrayList<String> invitedUsers = new ArrayList<>();
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -78,9 +94,11 @@ public class SingleGroupManageActivity extends AppCompatActivity {
 
         setupImagePicker();
         loadGroupMembers();
+
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
         String userId = prefs.getString("userid", "0");
+
         btnEditPhoto.setOnClickListener(v -> openImagePicker());
         btnInviteMember.setOnClickListener(v -> showInviteDialog());
         btnExitGroup.setOnClickListener(v -> showExitDialog());
@@ -98,7 +116,7 @@ public class SingleGroupManageActivity extends AppCompatActivity {
                     .get()
                     .addOnSuccessListener(doc -> {
 
-                            // 🔽 圖片處理
+                            // 圖片處理
                             Bitmap bitmap;
                             if (imgGroupPhoto.getDrawable() instanceof BitmapDrawable) {
                                 bitmap = ((BitmapDrawable) imgGroupPhoto.getDrawable()).getBitmap();
@@ -109,7 +127,7 @@ public class SingleGroupManageActivity extends AppCompatActivity {
                             bitmap.compress(Bitmap.CompressFormat.JPEG, 10, stream);
                             String imageBase64 = Base64.encodeToString(stream.toByteArray(), Base64.DEFAULT);
 
-                            // 🔽 建立群組資料
+                            // 建立群組資料
                             Map<String, Object> groupData = new HashMap<>();
                             groupData.put("group_name", groupName);
                             groupData.put("group_image", (chocie == 1) ? imageBase64 : "123");
@@ -123,23 +141,23 @@ public class SingleGroupManageActivity extends AppCompatActivity {
                                     .document(userId)
                                     .collection("group")
                                     .document(groid)
-                                    .set(updatedData, SetOptions.merge())  // ✅ 僅更新指定欄位
+                                    .set(updatedData, SetOptions.merge())  // 僅更新指定欄位
                                     .addOnSuccessListener(aVoid -> Log.d("Firestore", "已更新自己群組資料"))
                                     .addOnFailureListener(e -> Log.e("Firestore", "更新自己群組失敗：" + e.getMessage()));
 
-// 🔽 更新每個受邀使用者的同一份群組資料
+// 更新每個受邀使用者的同一份群組資料
                             for (String invitedUid : invitedUsers) {
                                 db.collection("users")
                                         .document(invitedUid)
                                         .collection("group")
                                         .document(groid)
-                                        .set(updatedData, SetOptions.merge())  // ✅ 同樣只更新 group_name 和 group_image
+                                        .set(updatedData, SetOptions.merge())  // 同樣只更新 group_name 和 group_image
                                         .addOnSuccessListener(aVoid -> Log.d("Firestore", "已更新 " + invitedUid + " 的群組資料"))
                                         .addOnFailureListener(e -> Log.e("Firestore", "更新失敗：" + invitedUid + " 原因：" + e.getMessage()));
                             }
 
-                            Toast.makeText(SingleGroupManageActivity.this, "群組建立成功", Toast.LENGTH_SHORT).show();
-
+                            Toast.makeText(SingleGroupManageActivity.this, "群組更新成功", Toast.LENGTH_SHORT).show();
+                            goToGroupFragment();
 
                     })
                     .addOnFailureListener(e -> {
@@ -311,18 +329,76 @@ public class SingleGroupManageActivity extends AppCompatActivity {
 
         tvSend.setOnClickListener(v -> {
             String invitee = etInviteAccount.getText().toString().trim();
+
             if (!invitee.isEmpty()) {
-                Toast.makeText(context, "已送出邀請給：" + invitee, Toast.LENGTH_SHORT).show();
-                dialog.dismiss();
+                FirebaseFirestore db = FirebaseFirestore.getInstance();
+                SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
+                String userId = prefs.getString("userid", "0");
+
+                db.collection("users")
+                        .document(invitee)
+                        .get()
+                        .addOnSuccessListener(snapshot -> {
+                            if (snapshot.exists()) {
+                                // 確認該帳號存在
+                                db.collection("users")
+                                        .document(userId)
+                                        .collection("group")
+                                        .document(groid)
+                                        .get()
+                                        .addOnSuccessListener(groupSnapshot -> {
+                                            if (groupSnapshot.exists()) {
+                                                List<String> members = (List<String>) groupSnapshot.get("members");
+                                                if (members != null && members.contains(invitee)) {
+                                                    Toast.makeText(context, "該帳號已加入", Toast.LENGTH_SHORT).show();
+                                                } else {
+                                                    // 邀請流程
+                                                    invitedUsers.add(invitee);
+
+                                                    String baseDynamicLink = "https://fcunoteapp.page.link/";
+                                                    String deepLink = "https://fcunoteapp.page.link/joinGroup?group=" + groupName + "&uid=" + invitee;
+                                                    String inviteLink = baseDynamicLink +
+                                                            "?link=" + Uri.encode(deepLink) +
+                                                            "&apn=com.example.afinal" +
+                                                            "&afl=https://example.com/fallback";
+
+                                                    Map<String, Object> invitation = new HashMap<>();
+                                                    invitation.put("group", groupName);
+                                                    invitation.put("invited_by", userId);
+                                                    invitation.put("timestamp", System.currentTimeMillis());
+
+                                                    db.collection("invitations")
+                                                            .document(invitee + "_" + groupName)
+                                                            .set(invitation)
+                                                            .addOnSuccessListener(aVoid -> {
+                                                                sendEmailInvite(invitee, groupName, inviteLink);
+                                                                Toast.makeText(context, "邀請已寄出：" + invitee, Toast.LENGTH_SHORT).show();
+                                                                dialog.dismiss();
+                                                            })
+                                                            .addOnFailureListener(e -> {
+                                                                Toast.makeText(context, "邀請儲存失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                                            });
+                                                }
+                                            }
+                                        });
+                            } else {
+                                etInviteAccount.setError("查無此帳號");
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(context, "檢查帳號失敗：" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        });
             } else {
                 etInviteAccount.setError("請輸入帳號");
             }
         });
 
-        tvCancel.setOnClickListener(v -> dialog.dismiss());
 
+
+        tvCancel.setOnClickListener(v -> dialog.dismiss());
         dialog.show();
     }
+
 
     private void showExitDialog() {
         new AlertDialog.Builder(context)
@@ -375,5 +451,64 @@ public class SingleGroupManageActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("取消", null)
                 .show();
+    }
+
+
+    private void sendEmailInvite(String email, String groupName, String inviteLink) {
+        new Thread(() -> {
+            try {
+                URL url = new URL("https://api.emailjs.com/api/v1.0/email/send");
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setRequestProperty("origin", "http://localhost");
+                conn.setDoOutput(true);
+
+                String json = "{"
+                        + "\"service_id\":\"Note\","
+                        + "\"template_id\":\"template_Note_123456789\","
+                        + "\"user_id\":\"U01lo_BOb5hFWje4D\","
+                        + "\"template_params\":{"
+                        +     "\"email\":\"" + email + "\","
+                        +     "\"group_name\":\"" + groupName + "\","
+                        +     "\"link\":\"" + inviteLink + "\""
+                        + "}"
+                        + "}";
+
+                OutputStream os = conn.getOutputStream();
+                os.write(json.getBytes(StandardCharsets.UTF_8));
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(
+                        (responseCode == 200) ? conn.getInputStream() : conn.getErrorStream()
+                ));
+
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+
+                if (responseCode == 200) {
+                    Log.d("EmailJS", "成功寄出邀請信: " + email);
+                } else {
+                    Log.e("EmailJS", "寄信失敗（代碼 " + responseCode + "）：\n" + response);
+                }
+
+            } catch (Exception e) {
+                Log.e("EmailJS", "寄信過程錯誤: " + e.getMessage(), e);
+            }
+        }).start();
+    }
+
+    private void goToGroupFragment() {
+        Intent intent = new Intent(this, MainActivity2.class);
+        intent.putExtra("navigate_to", "group"); // 傳送要跳轉的 fragment 資訊
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        Log.d("IntentDebug", "goToGroupFragment() called,navigate_to = group");
+        startActivity(intent);
+        finish(); // 結束 JoinGroupActivity
     }
 }

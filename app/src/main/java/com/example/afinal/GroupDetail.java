@@ -58,6 +58,7 @@ public class GroupDetail extends AppCompatActivity {
         group_name = findViewById(R.id.tvGroupName);
         btnBack = findViewById(R.id.btnBack);
         imageView = findViewById(R.id.imageView);
+        imageView = findViewById(R.id.imageView);
         SharedPreferences pref = getSharedPreferences("gIdnameMap", MODE_PRIVATE);
         String jsonString = pref.getString("groupIdMap", null);
 
@@ -77,8 +78,8 @@ public class GroupDetail extends AppCompatActivity {
         }
 
         // 顯示從上一頁傳來的群組名稱
-        groupName= getIntent().getStringExtra("groupID");
-        String groupName2= groupIdMap.get(groupName);
+        groupName = getIntent().getStringExtra("groupID");
+        String groupName2 = groupIdMap.get(groupName);
         for (String k : groupIdMap.keySet()) {
             Log.d("mine", "key=" + k + ", value=" + groupIdMap.get(k));
         }
@@ -115,7 +116,7 @@ public class GroupDetail extends AppCompatActivity {
                                     .addOnSuccessListener(userDoc -> {
                                         String nickname = userDoc.getString("nickname");
 
-                                        // ✅ 加入 fallback 處理
+                                        // 加入 fallback 處理
                                         if (nickname != null && !nickname.trim().isEmpty()) {
                                             emailToNickname.put(email, nickname);
                                         } else {
@@ -129,7 +130,7 @@ public class GroupDetail extends AppCompatActivity {
                                         }
                                     })
                                     .addOnFailureListener(e -> {
-                                        // ❗失敗也 fallback，避免 map 沒有 key
+                                        // 失敗也 fallback，避免 map 沒有 key
                                         emailToNickname.put(email, email);
                                         loadedCount[0]++;
                                         if (loadedCount[0] == total) {
@@ -180,7 +181,7 @@ public class GroupDetail extends AppCompatActivity {
                                     String recordId = doc.getId();
 //                                    String groupName2= groupIdMap.get(groupName);
 
-                                    Log.d("mine2", "key=" + recordId + ", value=" +content);
+                                    Log.d("mine2", "key=" + recordId + ", value=" + content);
 
                                     Intent intent = new Intent(GroupDetail.this, GroupChargeEdit.class);
                                     intent.putExtra("groupId", groupName); // ← 加上這行
@@ -204,7 +205,6 @@ public class GroupDetail extends AppCompatActivity {
             intent.putExtra("groupName", groupName);
             startActivityForResult(intent, 100);
         });
-        /*
         imageView.setOnClickListener(v -> {
             Intent intent = new Intent(GroupDetail.this, SingleGroupManageActivity.class);
             intent.putExtra("groupId", groupName); // ← 加上這行
@@ -212,7 +212,6 @@ public class GroupDetail extends AppCompatActivity {
             startActivity(intent);
 //            startActivityForResult(intent, 102);
         });
-         */
     }
 
     // 處理從 GroupCharge2 回傳的結果，並更新收支邏輯與畫面
@@ -233,13 +232,14 @@ public class GroupDetail extends AppCompatActivity {
                     String date = parts[0];
                     String content = parts[1];
 
-                    // ✅ 轉換 balancesJson 成 Map<String, Float>
+                    // 轉換 balancesJson 成 Map<String, Float>
                     Map<String, Float> returnedBalances = new com.google.gson.Gson().fromJson(
                             balancesJson,
-                            new com.google.gson.reflect.TypeToken<Map<String, Float>>() {}.getType()
+                            new com.google.gson.reflect.TypeToken<Map<String, Float>>() {
+                            }.getType()
                     );
 
-                    // ✅ 儲存 Firestore：不在這裡加總 balances，由即時監聽處理
+                    // 儲存 Firestore：不在這裡加總 balances，由即時監聽處理
                     String recordId = UUID.randomUUID().toString();
                     Map<String, Object> recordData = new HashMap<>();
                     recordData.put("date", date);
