@@ -57,7 +57,7 @@ public class GroupDetail extends AppCompatActivity {
         bubbleView = findViewById(R.id.bubbleView);
         group_name = findViewById(R.id.tvGroupName);
         btnBack = findViewById(R.id.btnBack);
-        imageView=findViewById(R.id.imageView);
+        imageView = findViewById(R.id.imageView);
         SharedPreferences pref = getSharedPreferences("gIdnameMap", MODE_PRIVATE);
         String jsonString = pref.getString("groupIdMap", null);
 
@@ -204,6 +204,7 @@ public class GroupDetail extends AppCompatActivity {
             intent.putExtra("groupName", groupName);
             startActivityForResult(intent, 100);
         });
+        /*
         imageView.setOnClickListener(v -> {
             Intent intent = new Intent(GroupDetail.this, SingleGroupManageActivity.class);
             intent.putExtra("groupId", groupName); // ← 加上這行
@@ -211,6 +212,7 @@ public class GroupDetail extends AppCompatActivity {
             startActivity(intent);
 //            startActivityForResult(intent, 102);
         });
+         */
     }
 
     // 處理從 GroupCharge2 回傳的結果，並更新收支邏輯與畫面
@@ -249,10 +251,27 @@ public class GroupDetail extends AppCompatActivity {
                             .document(userId)
                             .collection("group")
                             .document(groupName)
-                            .collection("records")
-                            .document(recordId)
-                            .set(recordData)
-                            .addOnSuccessListener(aVoid -> Log.d("Firestore", "分帳記錄儲存成功"))
+                            .get()
+                            .addOnSuccessListener(documentSnapshot -> {
+                                if (documentSnapshot.exists()) {
+                                    List<String> members = (List<String>) documentSnapshot.get("members");
+                                    if (members != null) {
+                                        for (String memberId : members) {
+                                            db.collection("users")
+                                                    .document(memberId)
+                                                    .collection("group")
+                                                    .document(groupName)
+                                                    .collection("records")
+                                                    .document(recordId)
+                                                    .set(recordData)
+                                                    .addOnSuccessListener(aVoid -> Log.d("Firestore", "分帳記錄已同步至：" + memberId))
+                                                    .addOnFailureListener(e -> Log.e("Firestore", "同步失敗：" + e.getMessage()));
+                                        }
+                                    }
+                                } else {
+                                    Log.e("Firestore", "找不到該群組資料");
+                                }
+                            })
                             .addOnFailureListener(e -> Log.e("Firestore", "儲存失敗：" + e.getMessage()));
                 }
             }

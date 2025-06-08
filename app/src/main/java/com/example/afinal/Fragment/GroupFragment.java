@@ -497,32 +497,49 @@ public class GroupFragment extends Fragment {
                     .addOnSuccessListener(querySnapshot -> {
                         groupNames.clear();  // 清空舊資料
                         for (QueryDocumentSnapshot doc : querySnapshot) {
-                            String groupName = doc.getString("group_name"); // 使用 document 名稱為群組名稱
+                            String groupName = doc.getString("group_name");
                             groupNames.add(groupName);
-                            String id=doc.getId();
-                            // 讀取圖片（可選）
-                            String base64Image = doc.getString("group_image");
-                            Bitmap bitmap;
-                            // 可另外處理 base64 圖片，如果你希望顯示自訂圖示
-                            if(base64Image.equals("123")){
-                                bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.group_default_photo);
+                            String id = doc.getId();
+
+                            String rawImage = doc.getString("group_image");
+                            final String base64Image;
+                            if (rawImage != null && rawImage.equals("123")) {
+                                Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.group_default_photo);
                                 ByteArrayOutputStream stream = new ByteArrayOutputStream();
                                 bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream);
-                                base64Image= Base64.encodeToString(stream.toByteArray(), Base64.DEFAULT);
+                                base64Image = Base64.encodeToString(stream.toByteArray(), Base64.DEFAULT);
+                            } else {
+                                base64Image = rawImage;
                             }
+
+
                             List<String> members = (List<String>) doc.get("members");
                             int count = (members != null) ? members.size() : 1;
-                            // 預設顯示 1 人 0 筆，可根據資料庫設計修改
                             groupMembers.put(groupName, count);
+
+                            // 先預設為 0，之後再更新為 records 的實際筆數
                             groupRecords.put(groupName, 0);
 
-                            addGroupItem(groupName, false,base64Image,id); // 加入畫面
+                            // 抓取記帳筆數
+                            db.collection("users")
+                                    .document(userId)
+                                    .collection("group")
+                                    .document(id)
+                                    .collection("records")
+                                    .get()
+                                    .addOnSuccessListener(recordsSnapshot -> {
+                                        int recordCount = recordsSnapshot.size();
+                                        groupRecords.put(groupName, recordCount);  // ✅ 更新實際記帳筆數
+                                        addGroupItem(groupName, false, base64Image, id);
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.e("Firestore", "讀取記帳筆數失敗：" + e.getMessage());
+                                        groupRecords.put(groupName, -1); // -1 表示抓不到
+                                        addGroupItem(groupName, false, base64Image, id);
+                                    });
                         }
-//                        addGroupItem("新增群組", true,"","");
-//                        addGroupItem("", true,""); // 最後加入「新增群組」按鈕
-                    })
-                    .addOnFailureListener(e -> Log.e("Firestore", "讀取群組失敗：" + e.getMessage()));
+                    });
+
         }
     }
-
 }
