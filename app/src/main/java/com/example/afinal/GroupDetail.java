@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.ArrayAdapter;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -13,6 +14,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.*;
 
@@ -26,8 +30,9 @@ public class GroupDetail extends AppCompatActivity {
     private ImageButton btnBack; // 返回上一頁的按鈕
     private String groupName; // 從上一頁傳來的群組名稱
     private String userId; // 成員
+    private ImageView imageView;
     private FirebaseFirestore db; // 資料庫
-
+    private Map<String, String> groupIdMap;
     // 顯示用資料
     private List<String> displayItems = new ArrayList<>(); // ListView 要顯示的所有項目（含結算摘要與記錄）
     private ArrayAdapter<String> adapter; // 對應的 Adapter 物件
@@ -52,10 +57,35 @@ public class GroupDetail extends AppCompatActivity {
         bubbleView = findViewById(R.id.bubbleView);
         group_name = findViewById(R.id.tvGroupName);
         btnBack = findViewById(R.id.btnBack);
+        imageView=findViewById(R.id.imageView);
+        SharedPreferences pref = getSharedPreferences("gIdnameMap", MODE_PRIVATE);
+        String jsonString = pref.getString("groupIdMap", null);
+
+        groupIdMap = new HashMap<>();
+        if (jsonString != null) {
+            try {
+                JSONObject jsonObject = new JSONObject(jsonString);
+                Iterator<String> keys = jsonObject.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    String value = jsonObject.getString(key);
+                    groupIdMap.put(key, value);
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
 
         // 顯示從上一頁傳來的群組名稱
-        groupName = getIntent().getStringExtra("groupName");
-        if (groupName != null) group_name.setText(groupName);
+        groupName= getIntent().getStringExtra("groupID");
+        String groupName2= groupIdMap.get(groupName);
+        for (String k : groupIdMap.keySet()) {
+            Log.d("mine", "key=" + k + ", value=" + groupIdMap.get(k));
+        }
+        Log.d("Debug", "groupName2原始值=[" + groupName2 + "]");
+        Log.d("Debug", "groupName原始值=[" + groupName + "]");
+//        String groupName= groupIdMap.get(oldid);
+        if (groupName != null) group_name.setText(groupName2);
 
         // 點擊返回按鈕：結束目前頁面，回上一頁
         btnBack.setOnClickListener(v -> finish());
@@ -148,10 +178,13 @@ public class GroupDetail extends AppCompatActivity {
                             .addOnSuccessListener(querySnapshot -> {
                                 for (QueryDocumentSnapshot doc : querySnapshot) {
                                     String recordId = doc.getId();
+//                                    String groupName2= groupIdMap.get(groupName);
+
+                                    Log.d("mine2", "key=" + recordId + ", value=" +content);
 
                                     Intent intent = new Intent(GroupDetail.this, GroupChargeEdit.class);
                                     intent.putExtra("groupId", groupName); // ← 加上這行
-                                    intent.putExtra("groupName", groupName);
+                                    intent.putExtra("groupName", groupName2);
                                     intent.putExtra("recordId", recordId);
                                     intent.putExtra("date", date);
                                     intent.putExtra("content", content);
@@ -170,6 +203,13 @@ public class GroupDetail extends AppCompatActivity {
             Intent intent = new Intent(GroupDetail.this, GroupCharge2.class);
             intent.putExtra("groupName", groupName);
             startActivityForResult(intent, 100);
+        });
+        imageView.setOnClickListener(v -> {
+            Intent intent = new Intent(GroupDetail.this, SingleGroupManageActivity.class);
+            intent.putExtra("groupId", groupName); // ← 加上這行
+            intent.putExtra("groupName", groupName2);
+            startActivity(intent);
+//            startActivityForResult(intent, 102);
         });
     }
 
