@@ -76,7 +76,8 @@ public class Charge extends AppCompatActivity {
     private static final int MAX_LEN = 20;
     private String userId = "0";
     private static final int REQUEST_CODE_PICK_IMAGE = 1001;
-
+    private EditText etLocate;
+    private String placeId;
     private TextView tvAmountDisplay, tvNote, tvDateDisplay;
     private Button btnImageUpload;
     private int selectedIconRes;
@@ -96,7 +97,7 @@ public class Charge extends AppCompatActivity {
             userId = "0"; // 明確未登入
         }
 
-
+        etLocate = findViewById(R.id.locate);
         /*if (!userId.equals("0")) {
             syncLocalRecordsIfLoggedIn(userId);
         }*/
@@ -220,14 +221,14 @@ public class Charge extends AppCompatActivity {
 
             if (note != null && !note.isEmpty()) tvNote.setText(note);
             if (date != null && !date.isEmpty()) tvDateDisplay.setText(date);
-            EditText etLocate = findViewById(R.id.locate);
+
             if (location != null && !location.isEmpty()) etLocate.setText(location);
         }
 
         findViewById(R.id.confirm).setOnClickListener(v -> {
             autoEvaluateIfNeeded();
 
-            EditText etLocate = findViewById(R.id.locate);
+
             final String location = etLocate.getText().toString();
             String priceRaw = tvAmountDisplay.getText().toString().replaceAll("[^\\d.]", "");
             final String price = priceRaw.replaceFirst("^0+(?!$)", "");
@@ -236,7 +237,29 @@ public class Charge extends AppCompatActivity {
             for (Uri uri : uploadedImageUris) {
                 imageUriStrings.add(uri.toString());
             }
+            SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
+            String userid = prefs.getString("userid", "0");
 
+            if (!userid.equals("0")) {
+                FirebaseFirestore db = FirebaseFirestore.getInstance();
+                DocumentReference placeRef = db.collection("users").document(userid)
+                        .collection("map").document(placeId);
+
+                placeRef.get().addOnSuccessListener(snapshot -> {
+                    if (snapshot.exists()) {
+                        // 若文件已存在，將 images 陣列更新
+                        for (String imageUri : imageUriStrings) {
+                            placeRef.update("images", FieldValue.arrayUnion(imageUri));
+                        }
+                    } else {
+                        // 若不存在，建立新文件並儲存
+                        Map<String, Object> data = new HashMap<>();
+                        data.put("place_id", placeId);
+                        data.put("images", imageUriStrings);
+                        placeRef.set(data);
+                    }
+                });
+            }
             sendBackResult(imageUriStrings, location, price);
         });
 
@@ -261,6 +284,7 @@ public class Charge extends AppCompatActivity {
         result.putExtra("location", location);
         result.putExtra("imageCount", imageUrls.size());
         result.putStringArrayListExtra("imageUrls", new ArrayList<>(imageUrls));
+        result.putExtra("placeId", placeId);
         result.putExtra("edit", getIntent().getBooleanExtra("edit", false));
         result.putExtra("position", getIntent().getIntExtra("position", -1));
         setResult(RESULT_OK, result);
@@ -313,7 +337,7 @@ public class Charge extends AppCompatActivity {
 
 
     private void setupLocateClick() {
-        EditText etLocate = findViewById(R.id.locate);
+
         etLocate.setFocusable(false);
 
         etLocate.setOnClickListener(v -> {
@@ -398,6 +422,16 @@ public class Charge extends AppCompatActivity {
                 final int takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
                 getContentResolver().takePersistableUriPermission(uri, takeFlags);
             }
+        }
+        if (requestCode == 2000 && resultCode == RESULT_OK) {
+            Place place = Autocomplete.getPlaceFromIntent(data);
+
+            String name = place.getName();         // 地點名稱
+            String address = place.getAddress();   // 地址
+            placeId = place.getId();        // ✅ Place ID 就是這裡取得！
+
+            etLocate.setText(name);  // 或任意顯示方式
+            Log.d("Place Info", "Place ID: " + placeId);
         }
     }
 
