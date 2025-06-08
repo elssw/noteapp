@@ -42,6 +42,7 @@
     import java.util.HashMap;
     import java.util.List;
     import java.util.Map;
+    import java.util.UUID;
 
     public class UserFragment extends Fragment {
         private static final int REQ_CHARGE = 100;
@@ -55,6 +56,7 @@
         private RecordAdapter adapter;
         private int selectedYear, selectedMonth;
         private final List<Record> allRecords = new ArrayList<>();
+        private String userId;
 
         @Nullable
         @Override
@@ -65,6 +67,8 @@
         @Override
         public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
             super.onViewCreated(view, savedInstanceState);
+
+            userId = getUserId();
             ViewCompat.setOnApplyWindowInsetsListener(view.findViewById(R.id.main), (v, insets) -> {
                 Insets s = insets.getInsets(WindowInsetsCompat.Type.systemBars());
                 v.setPadding(s.left, s.top, s.right, s.bottom);
@@ -88,7 +92,9 @@
                     i.putExtra("categoryName", record.getCategoryName());
                     i.putExtra("location", record.getLocation());
                     i.putExtra("position", position);
-                    i.putExtra("userId", getUserId());
+                    if (!userId.equals("0")) {
+                        i.putExtra("userId", userId);
+                    }
                     startActivityForResult(i, REQ_CHARGE);
                 }
 
@@ -99,10 +105,19 @@
                             .setMessage("確定要刪除這筆記帳紀錄嗎？")
                             .setPositiveButton("刪除", (d, w) -> {
                                 allRecords.remove(position);
-                                removeFromStorage(record, UserFragment.this::refreshList);
-                            })
-                            .setNegativeButton("取消", null)
-                            .show();
+                                if (userId.equals("0")) {
+                                    // 本地刪除
+                                    removeFromStorage(record, UserFragment.this::refreshList);
+                                } else {
+                                    // 直接用 docId 刪除單一文件
+                                    FirebaseFirestore.getInstance()
+                                            .collection("users").document(userId)
+                                            .collection("records")
+                                            .document(record.getDocId())
+                                            .delete()
+                                            .addOnSuccessListener(a -> refreshList());
+                                }
+                            }).setNegativeButton("取消", null).show();
                 }
             });
             rvRecords.setAdapter(adapter);
@@ -116,7 +131,9 @@
             FloatingActionButton fab = view.findViewById(R.id.fabAdd);
             fab.setOnClickListener(v -> {
                 Intent i = new Intent(requireContext(), Charge.class);
-                i.putExtra("userId", getUserId());
+                if (!userId.equals("0")) {
+                    i.putExtra("userId", userId); //登入時才傳
+                }
                 startActivityForResult(i, REQ_CHARGE);
             });
 
@@ -171,22 +188,24 @@
                 allRecords.addAll(loadLocalRecords());
                 refreshList();
             } else {
-                syncLocalIfExists(userId);
-                loadFirebaseRecords(userId);
+                syncLocalIfExists(userId, () -> loadFirebaseRecords(userId)); // ✅ 同步完成後再載入 Firebase
             }
         }
 
+
         private Record convertToRecord(LocalRecord lr) {
-            String cleanAmount = lr.amount.replaceFirst("^0+(?!$)", "");
+            String clean = lr.amount.replaceFirst("^0+(?!$)", "");
             return new Record(
+                    lr.id,               // 用 localRecord.id
                     lr.iconRes,
-                    "NT$" + cleanAmount,
+                    "NT$" + clean,
                     lr.note,
                     lr.date,
                     lr.categoryName,
                     lr.location
             );
         }
+
 
 
         private List<Record> loadLocalRecords() {
@@ -205,6 +224,7 @@
                     .addOnSuccessListener(query -> {
                         allRecords.clear();
                         for (DocumentSnapshot doc : query.getDocuments()) {
+                            String id = doc.getId();
                             String amount = doc.getString("amount");
                             if (amount != null) amount = amount.replaceFirst("^0+(?!$)", "");
                             String note = doc.getString("note");
@@ -213,20 +233,47 @@
                             String location = doc.getString("location");
                             Long iconResLong = doc.getLong("iconRes");
                             int iconRes = (iconResLong != null) ? iconResLong.intValue() : R.drawable.ic_add;
-                            allRecords.add(new Record(iconRes, "NT$" + amount, note, date, cat, location));
+                            allRecords.add(new Record(
+                                    id,
+                                    iconRes,
+                                    "NT$" + amount,
+                                    note,
+                                    date,
+                                    cat,
+                                    location
+                            ));
                         }
                         refreshList();
                     })
                     .addOnFailureListener(e -> Log.e("LoadFirebase", "錯誤: " + e.getMessage()));
         }
 
-        private void syncLocalIfExists(String userId) {
+
+        private void syncLocalIfExists(String userId, Runnable onSynced) {
             SharedPreferences prefs = requireContext().getSharedPreferences("local_records", Context.MODE_PRIVATE);
+
+            // ✅ 如果已經同步過，就跳過
+            if (prefs.getBoolean("has_synced", false)) {
+                onSynced.run();
+                return;
+            }
+
+            prefs.edit().putBoolean("has_synced", true).apply();
+
             String json = prefs.getString("records", "[]");
-            List<LocalRecord> locals = new Gson().fromJson(json, new TypeToken<List<LocalRecord>>(){}.getType());
+            List<LocalRecord> locals = new Gson().fromJson(json, new TypeToken<List<LocalRecord>>() {}.getType());
+
+            if (locals.isEmpty()) {
+                prefs.edit().putBoolean("has_synced", true).apply(); // 雖然是空的也標記已同步
+                onSynced.run();
+                return;
+            }
+
+            FirebaseFirestore db = FirebaseFirestore.getInstance();
+            final int total = locals.size();
+            final int[] count = {0};
 
             for (LocalRecord lr : locals) {
-                FirebaseFirestore db = FirebaseFirestore.getInstance();
                 Map<String, Object> data = new HashMap<>();
                 data.put("amount", lr.amount);
                 data.put("note", lr.note);
@@ -235,11 +282,34 @@
                 data.put("location", lr.location);
                 data.put("date", lr.date);
                 data.put("imageUrls", lr.imageUris);
+
                 db.collection("users").document(userId)
-                        .collection("records").add(data);
+                        .collection("records").add(data)
+                        .addOnSuccessListener(d -> {
+                            count[0]++;
+                            if (count[0] == total) {
+                                prefs.edit()
+                                        .remove("records") // ✅ 清除本地資料
+                                        .putBoolean("has_synced", true) // ✅ 標記已上傳
+                                        .apply();
+                                onSynced.run();
+                            }
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.e("Sync", "上傳失敗：" + e.getMessage());
+                            count[0]++;
+                            if (count[0] == total) {
+                                prefs.edit()
+                                        .remove("records")
+                                        .putBoolean("has_synced", true)
+                                        .apply();
+                                onSynced.run();
+                            }
+                        });
             }
-            prefs.edit().remove("records").apply();
         }
+
+
 
         private void refreshList() {
             String prefix = String.format("%d-%02d", selectedYear, selectedMonth);
@@ -274,7 +344,16 @@
                 boolean isEdit = data.getBooleanExtra("edit", false);
                 int position = data.getIntExtra("position", -1);
 
-                Record newRecord = new Record(icon, price, note, date, cat, location);
+                Record newRecord = new Record(
+                        "",       // 本地新建的資料先傳空 docId
+                        icon,
+                        price,
+                        note,
+                        date,
+                        cat,
+                        location
+                );
+
 
                 SharedPreferences prefs = requireContext().getSharedPreferences("login", Context.MODE_PRIVATE);
                 String userId = prefs.getString("userid", "0");
@@ -304,7 +383,6 @@
                                 .addOnFailureListener(e -> Log.e("EditFirebase", "刪除原紀錄失敗: " + e.getMessage()));
                     }
                 } else {
-                    allRecords.add(newRecord);
                     if (userId.equals("0")) saveToLocal(newRecord);
                     else saveToFirebase(newRecord, userId, this::refreshList);
                 }
@@ -313,71 +391,83 @@
 
 
         private void removeFromStorage(Record r, Runnable onDone) {
-            SharedPreferences prefs = requireContext().getSharedPreferences("login", Context.MODE_PRIVATE);
-            String userId = prefs.getString("userid", "0");
+            SharedPreferences prefsLogin = requireContext()
+                    .getSharedPreferences("login", Context.MODE_PRIVATE);
+            String userId = prefsLogin.getString("userid", "0");
+
             if (userId.equals("0")) {
-                SharedPreferences sp = requireContext().getSharedPreferences("local_records", Context.MODE_PRIVATE);
+                // 未登入 → 刪本地
+                SharedPreferences sp = requireContext()
+                        .getSharedPreferences("local_records", Context.MODE_PRIVATE);
                 String json = sp.getString("records", "[]");
-                List<LocalRecord> list = new Gson().fromJson(json, new TypeToken<List<LocalRecord>>(){}.getType());
-                list.removeIf(lr -> lr.date.equals(r.getDate()) && lr.amount.equals(r.getPrice().replaceAll("[^\\d.]", "")));
-                sp.edit().putString("records", new Gson().toJson(list)).apply();
-                onDone.run(); // 本地刪除完馬上 refresh
+                List<LocalRecord> list = new Gson().fromJson(
+                        json, new TypeToken<List<LocalRecord>>(){}.getType()
+                );
+
+                // 用 docId（也就是 LocalRecord.id）精準刪除
+                for (int i = 0; i < list.size(); i++) {
+                    if (list.get(i).id.equals(r.getDocId())) {
+                        list.remove(i);
+                        break;
+                    }
+                }
+
+                sp.edit()
+                        .putString("records", new Gson().toJson(list))
+                        .apply();
+
+                // 刪完馬上刷新
+                onDone.run();
+
             } else {
+                // 已登入 → 刪 Firestore 裡的單一 document
                 FirebaseFirestore.getInstance()
-                        .collection("users").document(userId)
+                        .collection("users")
+                        .document(userId)
                         .collection("records")
-                        .whereEqualTo("date", r.getDate())
-                        .whereEqualTo("amount", r.getPrice().replaceAll("[^\\d.]", ""))
-                        .whereEqualTo("note", r.getNote())
-                        .get()
-                        .addOnSuccessListener(q -> {
-                            List<DocumentSnapshot> docs = q.getDocuments();
-                            if (docs.isEmpty()) {
-                                onDone.run(); // 沒有資料可以刪也要 refresh
-                                return;
-                            }
-
-                            final int total = docs.size();
-                            final int[] count = {0};
-
-                            for (DocumentSnapshot doc : docs) {
-                                doc.getReference().delete()
-                                        .addOnSuccessListener(aVoid -> {
-                                            count[0]++;
-                                            if (count[0] == total) onDone.run(); // 等全部刪除後才 refresh
-                                        })
-                                        .addOnFailureListener(e -> {
-                                            Log.e("FirebaseDelete", "刪除失敗：" + e.getMessage());
-                                            count[0]++;
-                                            if (count[0] == total) onDone.run(); // 即使有刪除失敗也不能卡住
-                                        });
-                            }
-                        })
+                        .document(r.getDocId())
+                        .delete()
+                        .addOnSuccessListener(aVoid -> onDone.run())
                         .addOnFailureListener(e -> {
-                            Log.e("FirebaseQuery", "查詢失敗：" + e.getMessage());
-                            onDone.run(); // 查詢失敗也讓畫面刷新避免卡死
+                            Log.e("FirestoreDelete", "刪除失敗：" + e.getMessage());
+                            onDone.run();
                         });
-
             }
         }
 
 
 
 
+
         private void saveToLocal(Record r) {
-            SharedPreferences prefs = requireContext().getSharedPreferences("local_records", Context.MODE_PRIVATE);
+            SharedPreferences prefs = requireContext()
+                    .getSharedPreferences("local_records", Context.MODE_PRIVATE);
             String json = prefs.getString("records", "[]");
-            List<LocalRecord> list = new Gson().fromJson(json, new TypeToken<List<LocalRecord>>(){}.getType());
-            list.add(new LocalRecord(
+            List<LocalRecord> list = new Gson().fromJson(
+                    json, new TypeToken<List<LocalRecord>>(){}.getType()
+            );
+
+            // 1. 先產生一個唯一 id
+            String uuid = UUID.randomUUID().toString();
+
+            // 2. 用帶 id 的建構子建立 LocalRecord
+            LocalRecord lr = new LocalRecord(
+                    uuid,
                     r.getIconResId(),
                     r.getPrice().replaceAll("[^\\d.]", ""),
                     r.getNote(),
                     r.getDate(),
                     r.getCategoryName(),
                     r.getLocation(),
-                    Collections.emptyList()
-            ));
-            prefs.edit().putString("records", new Gson().toJson(list)).apply();
+                    Collections.emptyList()  // 如果有圖片 URI，再從 r 拿進來
+            );
+
+            list.add(lr);
+
+            // 3. 寫回 prefs
+            prefs.edit()
+                    .putString("records", new Gson().toJson(list))
+                    .apply();
         }
 
         private void removeFromStorage(Record r) {

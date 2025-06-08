@@ -91,11 +91,15 @@ public class Charge extends AppCompatActivity {
         setContentView(R.layout.activity_charge);
 
         SharedPreferences loginPrefs = getSharedPreferences("login", MODE_PRIVATE);
-        userId = loginPrefs.getString("userid", "0");
-        if (!userId.equals("0")) {
-            syncLocalRecordsIfLoggedIn(userId);
+        userId = getIntent().getStringExtra("userId");
+        if (userId == null || userId.isEmpty()) {
+            userId = "0"; // 明確未登入
         }
 
+
+        /*if (!userId.equals("0")) {
+            syncLocalRecordsIfLoggedIn(userId);
+        }*/
 
         Intent i = getIntent();
         boolean isEdit = i.getBooleanExtra("edit", false);
@@ -233,28 +237,9 @@ public class Charge extends AppCompatActivity {
                 imageUriStrings.add(uri.toString());
             }
 
-            LocalRecord record = new LocalRecord();
-            record.amount = price;
-            record.note = tvNote.getText().toString();
-            record.categoryName = selectedCategoryName;
-            record.iconRes = selectedIconRes;
-            record.location = location;
-            record.date = tvDateDisplay.getText().toString();
-            record.imageUris = imageUriStrings;
-
-            SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
-            String userId = prefs.getString("userid", "0");
-
-            if (userId.equals("0")) {
-                // ❌ 未登入，先暫存於本地
-                saveLocally(record);
-            } else {
-                // ✅ 已登入，直接上傳至 Firestore
-                uploadToFirebase(record, userId);
-            }
-
             sendBackResult(imageUriStrings, location, price);
         });
+
 
 
     }
