@@ -1,6 +1,7 @@
 package com.example.afinal.Fragment;
 
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -30,8 +31,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentTransaction;
 
 import com.example.afinal.Fragment.Setting.SettingReminderFragment;
+import com.example.afinal.Fragment.Setting.SettingResetFragment;
 import com.example.afinal.R;
 import com.example.afinal.SignInActivity;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -52,7 +55,7 @@ public class SettingFragment extends Fragment {
     private TextView tvReminderAccounting;
     private TextView tvReminderState;
     private TextView tvAccountSwitch;
-
+    private TextView reset;
     // 儲存使用者偏好設定
     private SharedPreferences prefs;
 
@@ -78,9 +81,9 @@ public class SettingFragment extends Fragment {
         tvNickname = view.findViewById(R.id.tv_nickname);
         btnEdit = view.findViewById(R.id.btn_edit);
         tvReminderAccounting = view.findViewById(R.id.tv_accounting_reminder);
-        tvReminderState = view.findViewById(R.id.tv_reminder_state);
+//        tvReminderState = view.findViewById(R.id.tv_reminder_state);
         tvAccountSwitch=view.findViewById(R.id.tv_account_switch);
-
+        reset=view.findViewById(R.id.tv_reset_accounting_setting);
         prefs = requireContext().getSharedPreferences(PREF_SETTING, 0);
 
 
@@ -126,33 +129,62 @@ public class SettingFragment extends Fragment {
                     .setPositiveButton("確認", (dialog, which) -> {
                         String newName = input.getText().toString().trim();
                         if (!newName.isEmpty()) {
+                            FirebaseFirestore db = FirebaseFirestore.getInstance();
+                            SharedPreferences prefs = requireContext().getSharedPreferences("login", Context.MODE_PRIVATE);
+                            String userId = prefs.getString("userid", "0");
+                            if (!userId.equals("0")) {
+                                db.collection("users")
+                                        .document(userId)
+                                        .update("nickname", newName)
+                                        .addOnSuccessListener(aVoid -> {
+                                            Log.d("Firestore", "second_name 更新成功");
+                                        })
+                                        .addOnFailureListener(e -> {
+                                            Log.e("Firestore", "更新 second_name 失敗: " + e.getMessage());
+                                        });
+                            }
                             tvNickname.setText(newName);
                             prefs.edit().putString(KEY_NICKNAME, newName).apply();
-                            SharedPreferences loginPrefs = requireContext().getSharedPreferences("login", 0);
-                            String userId = loginPrefs.getString("userid", "");
 
-                            FirebaseFirestore.getInstance()
-                                    .collection("users")
-                                    .document(userId)
-                                    .update("nickname", newName)
-                                    .addOnSuccessListener(aVoid -> Log.d("Setting", "暱稱已同步到 Firestore"))
-                                    .addOnFailureListener(e -> Log.e("Setting", "更新暱稱失敗：" + e.getMessage()));
 
                         }
                     })
                     .setNegativeButton("取消", null)
                     .show();
         });
-
-        // 讀取 KEY_NICKNAME，default：暱稱
-        String savedName = prefs.getString(KEY_NICKNAME, "暱稱");
-        tvNickname.setText(savedName);
-
+        FirebaseFirestore dba = FirebaseFirestore.getInstance();
+        SharedPreferences prefs = requireContext().getSharedPreferences("login", Context.MODE_PRIVATE);
+        String userId = prefs.getString("userid", "0");
+        if (!userId.equals("0")) {
+            dba.collection("users")
+                    .document(userId)
+                    .get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists()) {
+                            String name = documentSnapshot.getString("nickname");
+                            if (name != null) {
+                                tvNickname.setText(name);
+                            } else {
+                                Log.d("Firestore", "second_name 欄位不存在");
+                            }
+                        } else {
+                            Log.d("Firestore", "文件不存在");
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e("Firestore", "讀取 second_name 失敗: " + e.getMessage());
+                    });
+        }
+        else {
+            // 讀取 KEY_NICKNAME，default：暱稱
+            String savedName = prefs.getString(KEY_NICKNAME, "暱稱");
+            tvNickname.setText(savedName);
+        }
 
         // 提醒狀態
         String mode = prefs.getString(KEY_REMINDER_MODE, "尚未設定");
         String time = prefs.getString(KEY_REMINDER_TIME, "");
-        tvReminderState.setText("提醒時間：" + mode + " " + time);
+       // tvReminderState.setText("提醒時間：" + mode + " " + time);
 
         // 帳號切換
         tvAccountSwitch.setOnClickListener(v-> {
@@ -374,7 +406,7 @@ public class SettingFragment extends Fragment {
 
         String mode = prefs.getString(KEY_REMINDER_MODE, "尚未設定");
         String time = prefs.getString(KEY_REMINDER_TIME, "");
-        tvReminderState.setText("提醒時間：" + mode + " " + time);
+        //tvReminderState.setText("提醒時間：" + mode + " " + time);
     }
 
 }
