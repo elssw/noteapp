@@ -32,9 +32,13 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -95,12 +99,24 @@ public class GroupFragment extends Fragment {
                                 groupIdMap.put(docId,groupName); // 🔑 儲存對應
                             }
                         }
+//                        for (String k : groupIdMap.keySet()) {
+//                            Log.d("mine2", "key=" + k + ", value=" + groupIdMap.get(k));
+//                        }
+                        SharedPreferences pref = requireContext().getSharedPreferences("gIdnameMap", Context.MODE_PRIVATE);
+                        SharedPreferences.Editor editor = pref.edit();
+
+                        JSONObject json = new JSONObject(groupIdMap);  // 把 Map 轉成 JSONObject
+                        editor.putString("groupIdMap", json.toString());  // 存成字串
+                        editor.apply();
+
+
                     })
                     .addOnFailureListener(e -> {
                         Log.e("Firestore", "載入群組失敗：" + e.getMessage());
                     });
 
         }
+//        loadGroupsFromFirestore();
         //refreshGroupItems();
         return view;
     }
@@ -265,7 +281,31 @@ public class GroupFragment extends Fragment {
                         .addToBackStack(null)
                         .commit();
             } else {
-                Toast.makeText(context, "進入 " + groupName, Toast.LENGTH_SHORT).show();
+
+                SharedPreferences pref = requireContext().getSharedPreferences("gIdnameMap", Context.MODE_PRIVATE);
+                String jsonString = pref.getString("groupIdMap", null);
+
+                Map<String, String>  groupIdMap2 = new HashMap<>();
+                if (jsonString != null) {
+                    try {
+                        JSONObject jsonObject = new JSONObject(jsonString);
+                        Iterator<String> keys = jsonObject.keys();
+                        while (keys.hasNext()) {
+                            String key = keys.next();
+                            String value = jsonObject.getString(key);
+                            groupIdMap2.put(key, value);
+                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+                String groupName2= groupIdMap2.get(gid);
+                Toast.makeText(context, "進入 " + groupName2, Toast.LENGTH_SHORT).show();
+
+
+                for (String k : groupIdMap2.keySet()) {
+                    Log.d("mine2", "key=" + k + ", value=" + groupIdMap.get(k));
+                }
                 // 🔽 原本跳到群組管理 Fragment
                 // SingleGroupManageFragment fragment = SingleGroupManageFragment.newInstance(groupName);
                 // requireActivity().getSupportFragmentManager()
@@ -276,7 +316,7 @@ public class GroupFragment extends Fragment {
 
                 // ✅ 改成跳到分帳情況 Activity
                 Intent intent = new Intent(context, GroupDetail.class);
-                intent.putExtra("groupName", groupName); // 若你要傳值可加上
+                intent.putExtra("groupID", gid); // 若你要傳值可加上
                 startActivity(intent);
             }
         });
@@ -448,6 +488,7 @@ public class GroupFragment extends Fragment {
         String userId = prefs.getString("userid", "0");
 
         if (!userId.equals("0")) {
+            addGroupItem("新增群組", true,"","");
             FirebaseFirestore db = FirebaseFirestore.getInstance();
             db.collection("users")
                     .document(userId)
@@ -477,7 +518,7 @@ public class GroupFragment extends Fragment {
 
                             addGroupItem(groupName, false,base64Image,id); // 加入畫面
                         }
-                        addGroupItem("新增群組", true,"","");
+//                        addGroupItem("新增群組", true,"","");
 //                        addGroupItem("", true,""); // 最後加入「新增群組」按鈕
                     })
                     .addOnFailureListener(e -> Log.e("Firestore", "讀取群組失敗：" + e.getMessage()));
