@@ -29,6 +29,7 @@
     import com.google.android.material.button.MaterialButton;
     import com.google.android.material.floatingactionbutton.FloatingActionButton;
     import com.google.firebase.firestore.FirebaseFirestore;
+    import com.google.firebase.firestore.Query;
     import com.google.gson.Gson;
     import com.google.gson.reflect.TypeToken;
     import com.google.firebase.firestore.DocumentSnapshot;
@@ -214,12 +215,14 @@
             List<LocalRecord> locals = new Gson().fromJson(json, new TypeToken<List<LocalRecord>>(){}.getType());
             List<Record> results = new ArrayList<>();
             for (LocalRecord lr : locals) results.add(convertToRecord(lr));
+            results.sort((a, b) -> b.getDate().compareTo(a.getDate()));
             return results;
         }
 
         private void loadFirebaseRecords(String userId) {
             FirebaseFirestore db = FirebaseFirestore.getInstance();
             db.collection("users").document(userId).collection("records")
+                    .orderBy("date", Query.Direction.DESCENDING)
                     .get()
                     .addOnSuccessListener(query -> {
                         allRecords.clear();
