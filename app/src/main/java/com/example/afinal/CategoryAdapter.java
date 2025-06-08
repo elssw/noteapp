@@ -22,6 +22,7 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.VH> {
     private final Context context;
     private final List<Category> data;
     private OnItemClickListener listener;
+    private int selectedPosition = RecyclerView.NO_POSITION;
 
     public CategoryAdapter(Context context, List<Category> data) {
         this.context = context;
@@ -32,17 +33,21 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.VH> {
         this.listener = l;
     }
 
-    static class VH extends RecyclerView.ViewHolder {
+    class VH extends RecyclerView.ViewHolder {
         ImageView ivIcon;
         TextView tvName;
+        View root;
+
         VH(@NonNull View itemView) {
             super(itemView);
-            ivIcon = itemView.findViewById(R.id.ivCategoryIcon);
-            tvName = itemView.findViewById(R.id.tvCategoryName);
+            ivIcon = itemView.findViewById(R.id.ivIcon);
+            tvName = itemView.findViewById(R.id.tvName);
+            root = itemView;
         }
     }
 
-    @NonNull @Override
+    @NonNull
+    @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(context)
                 .inflate(R.layout.item_category, parent, false);
@@ -54,7 +59,19 @@ public class CategoryAdapter extends RecyclerView.Adapter<CategoryAdapter.VH> {
         Category c = data.get(pos);
         h.ivIcon.setImageResource(c.getIconResId());
         h.tvName.setText(c.getName());
-        h.itemView.setOnClickListener(v -> {
+
+        // 背景變色邏輯
+        if (pos == selectedPosition) {
+            h.root.setBackgroundColor(0xFFE0F7FA); // 淺藍色
+        } else {
+            h.root.setBackgroundColor(0x00000000); // 透明
+        }
+
+        h.root.setOnClickListener(v -> {
+            int prevSelected = selectedPosition;
+            selectedPosition = h.getAdapterPosition();
+            notifyItemChanged(prevSelected);
+            notifyItemChanged(selectedPosition);
             if (listener != null) listener.onItemClick(c);
         });
     }

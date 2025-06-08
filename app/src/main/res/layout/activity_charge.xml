@@ -8,7 +8,6 @@
     android:padding="16dp"
     tools:context=".Charge">
 
-    <!-- 左上角的返回鍵 -->
     <ImageButton
         android:id="@+id/btnBack"
         android:layout_width="32dp"
@@ -17,13 +16,12 @@
         android:layout_marginTop="6dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="返回"
-        android:src="@drawable/ic_arrow_back"
+        android:src="@drawable/back"
         app:layout_constraintBottom_toTopOf="@+id/items"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
 
-    <!-- 原本的 locate EditText，改 Start 約束指向 btnBack -->
     <EditText
         android:id="@+id/locate"
         android:layout_width="0dp"
@@ -38,7 +36,6 @@
         app:layout_constraintEnd_toEndOf="parent"/>
 
 
-    <!-- RecyclerView 必须在 locate 下面、note 之上-->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/items"
         android:layout_width="0dp"
@@ -100,244 +97,321 @@
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 
-
-
-    <!-- 底部淺灰背景容器，包含鍵盤 -->
     <LinearLayout
         android:id="@+id/footerContainer"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:background="#EEEEEE"
+        android:orientation="vertical"
         android:padding="8dp"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
+        app:layout_constraintStart_toStartOf="parent">
 
-        <!-- 第一行: 1,2,3,÷,AC -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/number_1"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
-                android:text="1"
                 android:backgroundTint="@android:color/white"
+                android:text="1"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/number_2"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="2"
                 android:backgroundTint="@android:color/white"
+                android:text="2"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
+
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/number_3"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="3"
                 android:backgroundTint="@android:color/white"
+                android:text="3"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
+
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/divide"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="÷"
                 android:backgroundTint="@android:color/white"
+                android:text="÷"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
+
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/clear"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="AC"
+                android:layout_weight="1"
                 android:backgroundTint="@android:color/white"
+                android:text="AC"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
+
                 app:cornerRadius="5dp" />
         </LinearLayout>
 
-        <!-- 第二行: 4,5,6,*,← -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/number_4"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
-                android:text="4"
                 android:backgroundTint="@android:color/white"
+                android:text="4"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/number_5"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="5"
                 android:backgroundTint="@android:color/white"
+                android:text="5"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/number_6"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="6"
                 android:backgroundTint="@android:color/white"
+                android:text="6"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/multiply"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="*"
                 android:backgroundTint="@android:color/white"
+                android:text="*"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/back"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="←"
                 android:backgroundTint="@android:color/white"
+                android:text="←"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
         </LinearLayout>
 
-        <!-- 第三行: 7,8,9,+,圖 -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/number_7"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
-                android:text="7"
                 android:backgroundTint="@android:color/white"
+                android:text="7"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/number_8"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="8"
                 android:backgroundTint="@android:color/white"
+                android:text="8"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/number_9"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="9"
                 android:backgroundTint="@android:color/white"
+                android:text="9"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/plus"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="+"
                 android:backgroundTint="@android:color/white"
+                android:text="+"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/image"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="圖"
                 android:backgroundTint="@android:color/white"
+                android:text="圖"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
         </LinearLayout>
 
-        <!-- 第四行: .,0,=,-,OK -->
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/point"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
-                android:text="."
                 android:backgroundTint="@android:color/white"
+                android:text="."
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/number_0"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="0"
                 android:backgroundTint="@android:color/white"
+                android:text="0"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/equal"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="="
                 android:backgroundTint="@android:color/white"
+                android:text="="
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/subtract"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="-"
                 android:backgroundTint="@android:color/white"
+                android:text="-"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/confirm"
-                android:layout_width="75dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="50dp"
                 android:layout_marginStart="4dp"
-                android:text="OK"
                 android:backgroundTint="@android:color/white"
+                android:text="OK"
                 android:textColor="@android:color/black"
+                android:textSize="16sp"
+                android:gravity="center"
+                android:padding="0dp"
                 app:cornerRadius="5dp" />
         </LinearLayout>
 
