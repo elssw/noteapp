@@ -77,7 +77,7 @@ public class Charge extends AppCompatActivity {
     private String userId = "0";
     private static final int REQUEST_CODE_PICK_IMAGE = 1001;
     private EditText etLocate;
-    private String placeId;
+    private String placeId="";
     private TextView tvAmountDisplay, tvNote, tvDateDisplay;
     private Button btnImageUpload;
     private int selectedIconRes;
@@ -239,26 +239,33 @@ public class Charge extends AppCompatActivity {
             }
             SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
             String userid = prefs.getString("userid", "0");
+            if(!placeId.equals("")) {
+                if (!userid.equals("0")) {
+                    FirebaseFirestore db = FirebaseFirestore.getInstance();
+                    DocumentReference placeRef = db.collection("users").document(userid)
+                            .collection("map").document(placeId);
 
-            if (!userid.equals("0")) {
-                FirebaseFirestore db = FirebaseFirestore.getInstance();
-                DocumentReference placeRef = db.collection("users").document(userid)
-                        .collection("map").document(placeId);
+                    placeRef.get().addOnSuccessListener(snapshot -> {
+                        if (snapshot.exists()) {
+                            String comment=tvNote.getText().toString();
+                            // 若文件已存在，將 images 陣列更新
+                            Map<String, Object> updates = new HashMap<>();
+                            updates.put("comment", comment);
+                            updates.put("images", FieldValue.arrayUnion(imageUriStrings.toArray()));
 
-                placeRef.get().addOnSuccessListener(snapshot -> {
-                    if (snapshot.exists()) {
-                        // 若文件已存在，將 images 陣列更新
-                        for (String imageUri : imageUriStrings) {
-                            placeRef.update("images", FieldValue.arrayUnion(imageUri));
+                            placeRef.update(updates)
+                                    .addOnSuccessListener(unused -> Log.d("Firestore", "資料已更新"))
+                                    .addOnFailureListener(e -> Log.e("Firestore", "更新失敗：" + e.getMessage()));
+                        } else {
+                            // 若不存在，建立新文件並儲存
+                            Map<String, Object> data = new HashMap<>();
+                            data.put("place_id", placeId);
+                            data.put("comment", tvNote.getText().toString());
+                            data.put("images", imageUriStrings);
+                            placeRef.set(data);
                         }
-                    } else {
-                        // 若不存在，建立新文件並儲存
-                        Map<String, Object> data = new HashMap<>();
-                        data.put("place_id", placeId);
-                        data.put("images", imageUriStrings);
-                        placeRef.set(data);
-                    }
-                });
+                    });
+                }
             }
             sendBackResult(imageUriStrings, location, price);
         });
@@ -491,11 +498,17 @@ public class Charge extends AppCompatActivity {
             }
             String expr = amountBuilder.toString().replace('×', '*').replace('÷', '/');
             double res = evaluate(expr);
-            String s = String.valueOf(res == Math.floor(res) ? (long) res : res);
-            if (s.length() > MAX_LEN) s = s.substring(0, MAX_LEN);
+            String s = String.valueOf(res);
+            if (s.endsWith(".0")) {
+                s = s.substring(0, s.length() - 2);
+            }
+            if (s.length() > MAX_LEN) {
+                s = s.substring(0, MAX_LEN);
+            }
             tvAmountDisplay.setText("NT$" + s);
             amountBuilder.setLength(0);
             amountBuilder.append(s);
+
         } catch (Exception e) {
             tvAmountDisplay.setText("Error");
             amountBuilder.setLength(0);
