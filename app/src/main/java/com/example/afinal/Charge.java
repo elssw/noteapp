@@ -94,13 +94,10 @@ public class Charge extends AppCompatActivity {
         SharedPreferences loginPrefs = getSharedPreferences("login", MODE_PRIVATE);
         userId = getIntent().getStringExtra("userId");
         if (userId == null || userId.isEmpty()) {
-            userId = "0"; // 明確未登入
+            userId = "0";
         }
 
         etLocate = findViewById(R.id.locate);
-        /*if (!userId.equals("0")) {
-            syncLocalRecordsIfLoggedIn(userId);
-        }*/
 
         Intent i = getIntent();
         boolean isEdit = i.getBooleanExtra("edit", false);
@@ -187,20 +184,9 @@ public class Charge extends AppCompatActivity {
             intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivityForResult(Intent.createChooser(intent, "選擇圖片"), REQUEST_CODE_PICK_IMAGE);
-
         });
 
-        int[] ids = {
-                R.id.number_1, R.id.number_2, R.id.number_3,
-                R.id.number_4, R.id.number_5, R.id.number_6,
-                R.id.number_7, R.id.number_8, R.id.number_9,
-                R.id.number_0, R.id.point,
-                R.id.plus, R.id.subtract, R.id.multiply, R.id.divide
-        };
-        for (int id : ids) findViewById(id).setOnClickListener(this::onDigitClick);
-        findViewById(R.id.clear).setOnClickListener(this::onClearClick);
-        findViewById(R.id.back).setOnClickListener(this::onBackClick);
-        findViewById(R.id.equal).setOnClickListener(this::onEqualClick);
+        String docId = i.getStringExtra("docId");
 
         if (isEdit) {
             selectedIconRes = i.getIntExtra("iconRes", R.drawable.ic_add);
@@ -221,14 +207,11 @@ public class Charge extends AppCompatActivity {
 
             if (note != null && !note.isEmpty()) tvNote.setText(note);
             if (date != null && !date.isEmpty()) tvDateDisplay.setText(date);
-
             if (location != null && !location.isEmpty()) etLocate.setText(location);
         }
 
         findViewById(R.id.confirm).setOnClickListener(v -> {
             autoEvaluateIfNeeded();
-
-
             final String location = etLocate.getText().toString();
             String priceRaw = tvAmountDisplay.getText().toString().replaceAll("[^\\d.]", "");
             final String price = priceRaw.replaceFirst("^0+(?!$)", "");
@@ -237,34 +220,21 @@ public class Charge extends AppCompatActivity {
             for (Uri uri : uploadedImageUris) {
                 imageUriStrings.add(uri.toString());
             }
+
             SharedPreferences prefs = getSharedPreferences("login", MODE_PRIVATE);
             String userid = prefs.getString("userid", "0");
 
-            if (!userid.equals("0")) {
-                FirebaseFirestore db = FirebaseFirestore.getInstance();
-                DocumentReference placeRef = db.collection("users").document(userid)
-                        .collection("map").document(placeId);
-
-                placeRef.get().addOnSuccessListener(snapshot -> {
-                    if (snapshot.exists()) {
-                        // 若文件已存在，將 images 陣列更新
-                        for (String imageUri : imageUriStrings) {
-                            placeRef.update("images", FieldValue.arrayUnion(imageUri));
-                        }
-                    } else {
-                        // 若不存在，建立新文件並儲存
-                        Map<String, Object> data = new HashMap<>();
-                        data.put("place_id", placeId);
-                        data.put("images", imageUriStrings);
-                        placeRef.set(data);
-                    }
-                });
+            if (!userid.equals("0") && docId != null) {
+                FirebaseFirestore.getInstance()
+                        .collection("users").document(userid)
+                        .collection("records").document(docId)
+                        .update("imageUrls", imageUriStrings)
+                        .addOnSuccessListener(a -> Log.d("Update", "圖片更新成功"))
+                        .addOnFailureListener(e -> Log.e("Update", "圖片更新失敗: " + e.getMessage()));
             }
+
             sendBackResult(imageUriStrings, location, price);
         });
-
-
-
     }
 
     private void autoEvaluateIfNeeded() {
