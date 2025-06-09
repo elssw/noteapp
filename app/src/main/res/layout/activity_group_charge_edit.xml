@@ -203,9 +203,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="刪除紀錄"
+            android:textSize="16sp"
             android:textColor="#FFFFFF"
-            android:background="#D32F2F"
-            android:layout_marginTop="16dp"/>
+            android:layout_marginTop="16dp"
+            android:background="@drawable/edittext_bg"/>
 
     </LinearLayout>
 </ScrollView>
