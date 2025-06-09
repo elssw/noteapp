@@ -186,6 +186,20 @@ public class Charge extends AppCompatActivity {
             startActivityForResult(Intent.createChooser(intent, "選擇圖片"), REQUEST_CODE_PICK_IMAGE);
         });
 
+        int[] ids = {
+                R.id.number_1, R.id.number_2, R.id.number_3,
+                R.id.number_4, R.id.number_5, R.id.number_6,
+                R.id.number_7, R.id.number_8, R.id.number_9,
+                R.id.number_0, R.id.point,
+                R.id.plus, R.id.subtract, R.id.multiply, R.id.divide
+        };
+        for (int id : ids) {
+            findViewById(id).setOnClickListener(this::onDigitClick);
+        }
+        findViewById(R.id.clear).setOnClickListener(this::onClearClick);
+        findViewById(R.id.back).setOnClickListener(this::onBackClick);
+        findViewById(R.id.equal).setOnClickListener(this::onEqualClick);
+
         String docId = i.getStringExtra("docId");
 
         if (isEdit) {
@@ -461,11 +475,17 @@ public class Charge extends AppCompatActivity {
             }
             String expr = amountBuilder.toString().replace('×', '*').replace('÷', '/');
             double res = evaluate(expr);
-            String s = String.valueOf(res == Math.floor(res) ? (long) res : res);
-            if (s.length() > MAX_LEN) s = s.substring(0, MAX_LEN);
+            String s = String.valueOf(res);
+            if (s.endsWith(".0")) {
+                s = s.substring(0, s.length() - 2);
+            }
+            if (s.length() > MAX_LEN) {
+                s = s.substring(0, MAX_LEN);
+            }
             tvAmountDisplay.setText("NT$" + s);
             amountBuilder.setLength(0);
             amountBuilder.append(s);
+
         } catch (Exception e) {
             tvAmountDisplay.setText("Error");
             amountBuilder.setLength(0);
