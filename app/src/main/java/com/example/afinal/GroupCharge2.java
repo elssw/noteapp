@@ -7,9 +7,12 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.*;
@@ -24,6 +27,7 @@ import com.example.afinal.model.Member;
 import com.google.android.flexbox.FlexboxLayout;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 
@@ -34,7 +38,7 @@ public class GroupCharge2 extends AppCompatActivity {
     private EditText etAmount, etNote; // 使用者輸入金額與備註欄位
     private LinearLayout payerAmountContainer; // 動態產生每位付款人輸入欄位的容器
     private FlexboxLayout memberSelectionContainer; // 勾選每位成員是否參與分帳的區塊
-
+    private String base64Image;
     // 群組成員清單（實際使用時應改為從後端/Intent 取得）
     private List<Member> members = new ArrayList<>();
 
@@ -369,7 +373,18 @@ public class GroupCharge2 extends AppCompatActivity {
                     recordData.put("participants", selectedMembers);
                     recordData.put("balances", balancesToSend);
                     recordData.put("timestamp", new Date());
-
+                    Drawable drawable = imgPreview.getDrawable();
+                    if (drawable == null) {
+                        // 沒有選圖片，設為 "123"
+                        base64Image = "123";
+                    } else {
+                        // 將圖片轉為 Base64
+                        Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
+                        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 10, stream);
+                        base64Image = android.util.Base64.encodeToString(stream.toByteArray(), Base64.DEFAULT);
+                    }
+                    recordData.put("image", base64Image);
                     FirebaseFirestore db = FirebaseFirestore.getInstance();
                     db.collection("users")
                             .document(userId)

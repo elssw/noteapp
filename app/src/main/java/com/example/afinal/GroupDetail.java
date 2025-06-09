@@ -225,56 +225,7 @@ public class GroupDetail extends AppCompatActivity {
             String summary = data.getStringExtra("summary");
             String balancesJson = data.getStringExtra("balances");
 
-            if (newRecord != null && !newRecord.isEmpty() && balancesJson != null) {
-                // 解析日期與內容
-                String[] parts = newRecord.split(" - ");
-                if (parts.length >= 2) {
-                    String date = parts[0];
-                    String content = parts[1];
 
-                    // 轉換 balancesJson 成 Map<String, Float>
-                    Map<String, Float> returnedBalances = new com.google.gson.Gson().fromJson(
-                            balancesJson,
-                            new com.google.gson.reflect.TypeToken<Map<String, Float>>() {
-                            }.getType()
-                    );
-
-                    // 儲存 Firestore：不在這裡加總 balances，由即時監聽處理
-                    String recordId = UUID.randomUUID().toString();
-                    Map<String, Object> recordData = new HashMap<>();
-                    recordData.put("date", date);
-                    recordData.put("content", content);
-                    recordData.put("summary", summary);
-                    recordData.put("balances", returnedBalances);
-
-                    db.collection("users")
-                            .document(userId)
-                            .collection("group")
-                            .document(groupName)
-                            .get()
-                            .addOnSuccessListener(documentSnapshot -> {
-                                if (documentSnapshot.exists()) {
-                                    List<String> members = (List<String>) documentSnapshot.get("members");
-                                    if (members != null) {
-                                        for (String memberId : members) {
-                                            db.collection("users")
-                                                    .document(memberId)
-                                                    .collection("group")
-                                                    .document(groupName)
-                                                    .collection("records")
-                                                    .document(recordId)
-                                                    .set(recordData)
-                                                    .addOnSuccessListener(aVoid -> Log.d("Firestore", "分帳記錄已同步至：" + memberId))
-                                                    .addOnFailureListener(e -> Log.e("Firestore", "同步失敗：" + e.getMessage()));
-                                        }
-                                    }
-                                } else {
-                                    Log.e("Firestore", "找不到該群組資料");
-                                }
-                            })
-                            .addOnFailureListener(e -> Log.e("Firestore", "儲存失敗：" + e.getMessage()));
-                }
-            }
         }
 
         // 處理從 GroupChargeEdit 返回的更新
