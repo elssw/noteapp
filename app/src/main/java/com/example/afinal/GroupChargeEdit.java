@@ -7,9 +7,13 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.*;
@@ -25,6 +29,7 @@ import com.google.android.flexbox.FlexboxLayout;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.*;
 
@@ -35,7 +40,7 @@ public class GroupChargeEdit extends AppCompatActivity {
     private EditText etAmount, etNote; // 使用者輸入金額與備註欄位
     private LinearLayout payerAmountContainer; // 動態產生每位付款人輸入欄位的容器
     private FlexboxLayout memberSelectionContainer; // 勾選每位成員是否參與分帳的區塊
-
+    private String base64Image;
     // 群組成員清單（實際使用時應改為從後端/Intent 取得）
     private List<Member> members = new ArrayList<>();
     private ArrayList<String> originalPayers;
@@ -128,7 +133,22 @@ public class GroupChargeEdit extends AppCompatActivity {
                         double amount = documentSnapshot.getDouble("amount");
                         String note = documentSnapshot.getString("note");
                         String date = documentSnapshot.getString("date");
+                        String rawImage = documentSnapshot.getString("image");
 
+                        if (rawImage != null && !rawImage.equals("123")) {
+                            try {
+                                byte[] decodedBytes = Base64.decode(rawImage, Base64.DEFAULT);
+                                base64Image=rawImage;
+                                Bitmap decodedBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+                                imgPreview.setImageBitmap(decodedBitmap);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                imgPreview.setImageResource(R.drawable.group_default_photo); // 解碼失敗 fallback
+                            }
+                        }
+                        else{
+                           base64Image="123";
+                        }
                         originalPayers = (ArrayList<String>) documentSnapshot.get("payers");
                         payerAmounts = (ArrayList<Double>) documentSnapshot.get("payerAmounts");
                         originalParticipants = (ArrayList<String>) documentSnapshot.get("participants");
@@ -156,6 +176,7 @@ public class GroupChargeEdit extends AppCompatActivity {
                                                 // 成員都抓完後
                                                 if (members.size() == memberEmails.size()) {
                                                     restoreUI();
+
                                                 }
                                             });
                                         }
@@ -359,7 +380,18 @@ public class GroupChargeEdit extends AppCompatActivity {
                     updatedRecord.put("payerAmounts", payerAmounts);
                     updatedRecord.put("participants", selectedEmails);
                     updatedRecord.put("balances", balancesToSend);
-
+                    Drawable drawable = imgPreview.getDrawable();
+                    if (drawable == null) {
+                        // 沒有選圖片，設為 "123"
+                        base64Image = "123";
+                    } else {
+                        // 將圖片轉為 Base64
+                        Bitmap bitmap = ((BitmapDrawable) drawable).getBitmap();
+                        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 10, stream);
+                        base64Image = Base64.encodeToString(stream.toByteArray(), Base64.DEFAULT);
+                    }
+                    updatedRecord.put("image", base64Image);
                     db.collection("users")
                             .document(userId)
                             .collection("group")
@@ -482,6 +514,7 @@ public class GroupChargeEdit extends AppCompatActivity {
                 }
             }
         }
+
     }
     private void showPayerSelector() {
         if (members.isEmpty()) {
